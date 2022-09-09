@@ -1,6 +1,9 @@
-package main
+package pkg
 
 import (
+	"dalian-bot/internal/pkg/clients"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/discord"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -9,9 +12,6 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 )
-
-var DiscordClient *discordgo.Session
-var MongoClient *mongo.Client
 
 type Cred struct {
 	Discord
@@ -50,21 +50,25 @@ func InitDalian() error {
 		fmt.Println("failed opening Mongo connection.")
 		panic(err)
 	}
-	MongoClient = mongoClient
+	clients.RegisterMongoClient(mongoClient)
 
-	discordClient, err := discordgo.New("Bot " + cred.Token)
+	discordSession, err := discordgo.New("Bot " + cred.Token)
 	if err != nil {
 		fmt.Println("error creating Discord session")
 		panic(err)
 	}
 
-	DiscordClient = discordClient
+	clients.RegisterDiscordClient(discordSession)
 
-	err = discordClient.Open()
+	err = discordSession.Open()
 	if err != nil {
 		fmt.Println("error opening Discord connection")
 		panic(err)
 	}
+
+	commands.SetPrefix("$")
+
+	discord.RegisterHandlers()
 
 	fmt.Println("Bot is now running. Press Ctrl+C to exit.")
 	return nil
@@ -73,12 +77,12 @@ func InitDalian() error {
 func GracefulShutDalian() error {
 	//cleanly close down the Discord session
 	defer func() {
-		if err := MongoClient.Disconnect(context.TODO()); err != nil {
+		if err := clients.MongoClient.Disconnect(context.TODO()); err != nil {
 			fmt.Println("error closing Mongo connection!")
 		}
 		fmt.Println("Mongo connection closed.")
 	}()
-	DiscordClient.Close()
+	clients.DgSession.Close()
 	fmt.Println("Connection closed!")
 	return nil
 }
