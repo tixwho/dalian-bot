@@ -67,6 +67,7 @@ func InitDalian() error {
 	}
 
 	commands.SetPrefix("$")
+	commands.SetSeparator("$")
 
 	discord.RegisterHandlers()
 
