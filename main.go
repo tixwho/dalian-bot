@@ -7,6 +7,8 @@ import (
 	"syscall"
 )
 
+const VERSION = "0.0.3"
+
 func main() {
 
 	pkg.InitDalian()
