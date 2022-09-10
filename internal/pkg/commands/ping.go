@@ -7,6 +7,7 @@ import (
 )
 
 type PingCommand struct {
+	Command
 	PlainCommand
 }
 
