@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/kballard/go-shellquote"
 	"strings"
 )
 
@@ -71,4 +72,58 @@ func (cm *ArgCommand) SeparateArgs(content, separator string) int {
 }
 
 type IFlagCommand interface {
+}
+
+type FlagCommand struct {
+	// FlagMaps: flag name : ?args required
+	FlagArgstatMaps map[string][]string
+}
+
+func (cm *FlagCommand) ParseFlags(content string) error {
+	//0. initialize map
+	flagMap := make(map[string][]string)
+	//1. separate
+	temp, err := shellquote.Split(content)
+	if err != nil {
+		return err
+	}
+	//if no flags ever present
+	if len(temp) == 1 {
+		cm.FlagArgstatMaps = flagMap
+		return nil
+	}
+	//skipping first bloc
+	for i := 1; i < len(temp); i++ {
+		//check every argument with "-" if it has a subsequent arg
+		if strings.HasPrefix(temp[i], "-") {
+			//boundary
+			if i == len(temp)-1 {
+				//must be a flag without extra
+				tryInsertFlagMap([2]string{temp[i], ""}, flagMap)
+			} else {
+				//checking existence of extra flag
+				if !strings.HasPrefix(temp[i+1], "-") {
+					tryInsertFlagMap([2]string{temp[i], temp[i+1]}, flagMap)
+					//skip one block to make up for the extra arg
+					i++
+				} else {
+					tryInsertFlagMap([2]string{temp[i], ""}, flagMap)
+				}
+			}
+		}
+	}
+	cm.FlagArgstatMaps = flagMap
+	return nil
+}
+
+func tryInsertFlagMap(kvPair [2]string, flagMap map[string][]string) {
+	if v, ok := flagMap[kvPair[0]]; ok {
+		//only add arguments to flags w/ extra args.
+		if kvPair[1] != "" {
+			flagMap[kvPair[0]] = append(v, kvPair[1])
+		}
+	} else {
+		//create a new string slice and add first extra argument. can be "" if extra unnecessary.
+		flagMap[kvPair[0]] = []string{kvPair[1]}
+	}
 }

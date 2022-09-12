@@ -15,5 +15,6 @@ func RegisterCommand(command ICommand) error {
 		return errors.New(fmt.Sprintf("command %s already exist!", name))
 	}
 	CommandByName[name] = command
+	fmt.Printf("Registered command:%s\r\n", command.GetName())
 	return nil
 }

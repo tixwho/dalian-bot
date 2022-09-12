@@ -4,6 +4,7 @@ go 1.18
 
 require (
 	github.com/bwmarrin/discordgo v0.26.1
+	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	go.mongodb.org/mongo-driver v1.10.1
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2
 	gopkg.in/yaml.v2 v2.4.0
