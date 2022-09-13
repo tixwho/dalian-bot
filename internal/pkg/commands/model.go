@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"errors"
+	"fmt"
 	"github.com/kballard/go-shellquote"
 	"strings"
 )
@@ -74,9 +76,18 @@ func (cm *ArgCommand) SeparateArgs(content, separator string) int {
 type IFlagCommand interface {
 }
 
+type CommandFlag struct {
+	Name             string   // Flag name
+	FlagPrefix       []string // Flag prefix(s)
+	RequiresExtraArg bool     // Acceptance of extra arg
+	MultipleExtraArg bool     // Acceptance of multiple extra arg
+	MEGroup          []string // Mutually exclusive group
+}
+
 type FlagCommand struct {
 	// FlagMaps: flag name : ?args required
-	FlagArgstatMaps map[string][]string
+	FlagArgstatMaps  map[string][]string
+	AvailableFlagMap map[string]*CommandFlag
 }
 
 func (cm *FlagCommand) ParseFlags(content string) error {
@@ -99,20 +110,59 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 			//boundary
 			if i == len(temp)-1 {
 				//must be a flag without extra
-				tryInsertFlagMap([2]string{temp[i], ""}, flagMap)
+				tryInsertFlagMap([2]string{temp[i][1:], ""}, flagMap)
 			} else {
 				//checking existence of extra flag
 				if !strings.HasPrefix(temp[i+1], "-") {
-					tryInsertFlagMap([2]string{temp[i], temp[i+1]}, flagMap)
+					tryInsertFlagMap([2]string{temp[i][1:], temp[i+1]}, flagMap)
 					//skip one block to make up for the extra arg
 					i++
 				} else {
-					tryInsertFlagMap([2]string{temp[i], ""}, flagMap)
+					tryInsertFlagMap([2]string{temp[i][1:], ""}, flagMap)
 				}
 			}
 		}
 	}
 	cm.FlagArgstatMaps = flagMap
+	return nil
+}
+
+//todo：解决简写与全名混用问题
+func (cm *FlagCommand) ValidateFlagMap() error {
+	tempMEMap := make(map[string]CommandFlag)
+	for priKey, priExtra := range cm.FlagArgstatMaps {
+		//first check if the flag exist
+		if entry, ok := cm.AvailableFlagMap[priKey]; !ok {
+			return errors.New(fmt.Sprintf("Unknown flag:[%s]", priKey))
+		} else {
+			//checking extra arg status
+			if !entry.RequiresExtraArg && len(priExtra) > 0 {
+				return errors.New(fmt.Sprintf("Flag [%s] does NOT allow ANY extra argument", entry.Name))
+			}
+			//checking number of extra arg allowed
+			if !entry.MultipleExtraArg && len(priExtra) > 1 {
+				return errors.New(fmt.Sprintf("Flag [%s] allow exactly ONE extra argument", entry.Name))
+			}
+			//checking ME status
+			for _, v := range entry.MEGroup {
+				//CommandFlag of the same ME group must NOT present in the temporary validation map.
+				if occupiedFlag, ok := tempMEMap[v]; ok {
+					return errors.New(fmt.Sprintf("Flag [%s] is mutually exclusive w/ flag [%s]||ME Group Lock [%s]", entry.Name, occupiedFlag.Name, v))
+				}
+				//validation passed. adding it to temporary ME map for future validation
+				tempMEMap[v] = *entry
+			}
+
+		}
+	}
+	// All examination passed!
+	return nil
+}
+
+func (cm *FlagCommand) RegisterCommandFlag(theFlag CommandFlag) error {
+	for _, v := range theFlag.FlagPrefix {
+		cm.AvailableFlagMap[v] = &theFlag
+	}
 	return nil
 }
 
@@ -124,6 +174,10 @@ func tryInsertFlagMap(kvPair [2]string, flagMap map[string][]string) {
 		}
 	} else {
 		//create a new string slice and add first extra argument. can be "" if extra unnecessary.
-		flagMap[kvPair[0]] = []string{kvPair[1]}
+		if kvPair[1] != "" {
+			flagMap[kvPair[0]] = []string{kvPair[1]}
+		} else {
+			flagMap[kvPair[0]] = []string{}
+		}
 	}
 }

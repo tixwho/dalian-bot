@@ -16,6 +16,28 @@ type CrudCommand struct {
 func (c *CrudCommand) New() {
 	c.Name = "crud"
 	c.Identifiers = []string{"crud", "crud-second"}
+	c.AvailableFlagMap = make(map[string]*CommandFlag)
+	c.RegisterCommandFlag(CommandFlag{
+		Name:             "create",
+		FlagPrefix:       []string{"c", "create"},
+		RequiresExtraArg: false,
+		MultipleExtraArg: false,
+		MEGroup:          []string{"o"},
+	})
+	c.RegisterCommandFlag(CommandFlag{
+		Name:             "delete",
+		FlagPrefix:       []string{"d", "delete"},
+		RequiresExtraArg: false,
+		MultipleExtraArg: false,
+		MEGroup:          []string{"o"},
+	})
+	c.RegisterCommandFlag(CommandFlag{
+		Name:             "free",
+		FlagPrefix:       []string{"f", "free"},
+		RequiresExtraArg: true,
+		MultipleExtraArg: false,
+		MEGroup:          []string{},
+	})
 }
 
 func (c *CrudCommand) Match(a ...any) bool {
@@ -33,7 +55,11 @@ func (c *CrudCommand) Do(a ...any) error {
 		fmt.Println(err)
 		return err
 	}
-	clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r\n %v", c.FlagArgstatMaps))
+	if err := c.ValidateFlagMap(); err != nil {
+		clients.DgSession.ChannelMessageSend(m.ChannelID, err.Error())
+		return err
+	}
+	clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r %v", c.FlagArgstatMaps))
 	return nil
 }
 

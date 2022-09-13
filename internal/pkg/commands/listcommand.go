@@ -17,7 +17,6 @@ func (m *ListCommand) New() {
 }
 
 func (m *ListCommand) Match(a ...any) bool {
-	fmt.Println("Matching:" + m.Name)
 	msg, isMsgCreate := a[0].(*discordgo.MessageCreate)
 	if !isMsgCreate {
 		return false
