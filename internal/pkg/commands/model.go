@@ -55,7 +55,7 @@ func (cm *PlainCommand) MatchMessage(content string) (bool, string) {
 
 type IImplicitTextCommand interface {
 	ICommand
-	RegexMatchMessage(content string) (bool, string)
+	RegMatchMessage(content string) (bool, regexp.Regexp)
 }
 
 type ImplicitCommand struct {

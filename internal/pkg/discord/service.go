@@ -30,6 +30,14 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				return
 			}
 		}
+		//after that, test ImplicitCommand
+		if inCommand, ok := v.(commands.IImplicitTextCommand); ok {
+			if inCommand.Match(m) {
+				inCommand.Do(m)
+				//stop right there
+				return
+			}
+		}
 	}
 }
 
