@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/kballard/go-shellquote"
+	"regexp"
 	"strings"
 )
 
@@ -50,6 +51,24 @@ func (cm *PlainCommand) MatchMessage(content string) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+type IImplicitTextCommand interface {
+	ICommand
+	RegexMatchMessage(content string) (bool, string)
+}
+
+type ImplicitCommand struct {
+	RegexExpressions []*regexp.Regexp
+}
+
+func (cm *ImplicitCommand) RegMatchMessage(content string) (bool, regexp.Regexp) {
+	for _, reg := range cm.RegexExpressions {
+		if reg.MatchString(content) {
+			return true, *reg
+		}
+	}
+	return false, regexp.Regexp{}
 }
 
 type IArgCommand interface {
