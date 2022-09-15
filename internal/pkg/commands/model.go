@@ -104,7 +104,7 @@ type CommandFlag struct {
 }
 
 type FlagCommand struct {
-	// FlagMaps: flag name : ?args required
+	// FlagArgstatMaps: flag name : ?args required
 	FlagArgstatMaps  map[string][]string
 	AvailableFlagMap map[string]*CommandFlag
 }
@@ -113,6 +113,7 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 	//0. initialize map
 	flagMap := make(map[string][]string)
 	//1. separate
+	//todo: make flags compatible with commands with multiple arguments.
 	temp, err := shellquote.Split(content)
 	if err != nil {
 		return err
@@ -149,6 +150,7 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 //todo：解决简写与全名混用问题
 func (cm *FlagCommand) ValidateFlagMap() error {
 	tempMEMap := make(map[string]CommandFlag)
+	validatedArgStatMaps := make(map[string][]string)
 	for priKey, priExtra := range cm.FlagArgstatMaps {
 		//first check if the flag exist
 		if entry, ok := cm.AvailableFlagMap[priKey]; !ok {
@@ -171,8 +173,10 @@ func (cm *FlagCommand) ValidateFlagMap() error {
 				//validation passed. adding it to temporary ME map for future validation
 				tempMEMap[v] = *entry
 			}
-
+			// passed the validation, adding to cleaned flag
+			validatedArgStatMaps[entry.Name] = priExtra
 		}
+		cm.FlagArgstatMaps = validatedArgStatMaps
 	}
 	// All examination passed!
 	return nil

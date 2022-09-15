@@ -2,6 +2,7 @@ package commands
 
 import (
 	"dalian-bot/internal/pkg/clients"
+	"dalian-bot/internal/pkg/discord"
 	"github.com/bwmarrin/discordgo"
 	"os"
 )
@@ -40,9 +41,9 @@ func (cm *FixedImageCommand) Do(a ...any) error {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "unknown emote argument!")
 		return nil
 	} else {
-		if f, error := os.Open(v); error == nil {
+		if f, err := os.Open(v); err == nil {
 			defer f.Close()
-			err := clients.SendFile(m.ChannelID, f.Name(), f)
+			err := discord.SendFile(m.ChannelID, f.Name(), f)
 			return err
 		}
 	}
