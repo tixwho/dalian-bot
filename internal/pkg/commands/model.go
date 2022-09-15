@@ -98,7 +98,7 @@ type IFlagCommand interface {
 type CommandFlag struct {
 	Name             string   // Flag name
 	FlagPrefix       []string // Flag prefix(s)
-	RequiresExtraArg bool     // Acceptance of extra arg
+	AcceptsExtraArg  bool     // Acceptance of extra arg
 	MultipleExtraArg bool     // Acceptance of multiple extra arg
 	MEGroup          []string // Mutually exclusive group
 }
@@ -113,7 +113,7 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 	//0. initialize map
 	flagMap := make(map[string][]string)
 	//1. separate
-	//todo: make flags compatible with commands with multiple arguments.
+	// todo: make flags compatible with commands with multiple arguments.
 	temp, err := shellquote.Split(content)
 	if err != nil {
 		return err
@@ -147,7 +147,6 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 	return nil
 }
 
-//todo：解决简写与全名混用问题
 func (cm *FlagCommand) ValidateFlagMap() error {
 	tempMEMap := make(map[string]CommandFlag)
 	validatedArgStatMaps := make(map[string][]string)
@@ -157,10 +156,11 @@ func (cm *FlagCommand) ValidateFlagMap() error {
 			return errors.New(fmt.Sprintf("Unknown flag:[%s]", priKey))
 		} else {
 			//checking extra arg status
-			if !entry.RequiresExtraArg && len(priExtra) > 0 {
+			if !entry.AcceptsExtraArg && len(priExtra) > 0 {
 				return errors.New(fmt.Sprintf("Flag [%s] does NOT allow ANY extra argument", entry.Name))
 			}
 			//checking number of extra arg allowed
+			//i
 			if !entry.MultipleExtraArg && len(priExtra) > 1 {
 				return errors.New(fmt.Sprintf("Flag [%s] allow exactly ONE extra argument", entry.Name))
 			}
@@ -173,8 +173,19 @@ func (cm *FlagCommand) ValidateFlagMap() error {
 				//validation passed. adding it to temporary ME map for future validation
 				tempMEMap[v] = *entry
 			}
-			// passed the validation, adding to cleaned flag
-			validatedArgStatMaps[entry.Name] = priExtra
+			// passed the validation, adding to cleaned flag and validate again in case alias used.
+			currentFlagExtraArg, ok := validatedArgStatMaps[entry.Name]
+			if !ok {
+				//first time using this flag. should've passed all examinations.
+				validatedArgStatMaps[entry.Name] = priExtra
+			} else {
+				//alias used, need to examine number of extra argument
+				tempExtraArr := append(currentFlagExtraArg, priExtra...)
+				if !entry.MultipleExtraArg && len(tempExtraArr) > 1 {
+					return errors.New(fmt.Sprintf("Flag [%s] does NOT allow ANY extra argument", entry.Name))
+				}
+				validatedArgStatMaps[entry.Name] = tempExtraArr
+			}
 		}
 		cm.FlagArgstatMaps = validatedArgStatMaps
 	}

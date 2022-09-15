@@ -26,28 +26,35 @@ func (c *CrudCommand) New() {
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "create",
 		FlagPrefix:       []string{"c", "create"},
-		RequiresExtraArg: false,
+		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{"o"},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "read",
 		FlagPrefix:       []string{"r", "read"},
-		RequiresExtraArg: false,
+		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{"o"},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "delete",
 		FlagPrefix:       []string{"d", "delete"},
-		RequiresExtraArg: false,
+		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{"o"},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "free",
 		FlagPrefix:       []string{"f", "free"},
-		RequiresExtraArg: true,
+		AcceptsExtraArg:  true,
+		MultipleExtraArg: false,
+		MEGroup:          []string{},
+	})
+	c.RegisterCommandFlag(CommandFlag{
+		Name:             "one_argument",
+		FlagPrefix:       []string{"one", "one_argument"},
+		AcceptsExtraArg:  true,
 		MultipleExtraArg: false,
 		MEGroup:          []string{},
 	})
@@ -92,6 +99,9 @@ func (c *CrudCommand) Do(a ...any) error {
 		return err
 	}
 	/* Flag parsed without error. Now follows various actions. */
+	if _, ok := c.FlagArgstatMaps["free"]; ok {
+		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r %v", c.FlagArgstatMaps))
+	}
 	if _, ok := c.FlagArgstatMaps["create"]; ok {
 		data.GetCollection("test_crud").InsertOne(context.TODO(), newTestStruct(m))
 		//debug
@@ -112,7 +122,9 @@ func (c *CrudCommand) Do(a ...any) error {
 		}
 		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found a Doc:%v", doc))
 	}
-	clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r %v", c.FlagArgstatMaps))
+	if err := clients.DgSession.MessageReactionAdd(m.ChannelID, m.ID, "\u2705"); err != nil {
+		fmt.Println("Error reacting: " + err.Error())
+	}
 	return nil
 }
 
