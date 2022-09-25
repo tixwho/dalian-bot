@@ -45,6 +45,8 @@ func InitDalian() error {
 		panic(err)
 	}
 
+	/* Setup Cron from database --reserved-- */
+
 	/* Dalian specific setups */
 	commands.SetPrefix("$")
 	commands.SetSeparator("$")

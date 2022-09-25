@@ -215,3 +215,7 @@ func tryInsertFlagMap(kvPair [2]string, flagMap map[string][]string) {
 		}
 	}
 }
+
+type IStagedListener interface {
+	nextStage()
+}

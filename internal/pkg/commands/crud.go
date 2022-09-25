@@ -5,9 +5,8 @@ import (
 	"dalian-bot/internal/pkg/data"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
 	"time"
 )
@@ -19,6 +18,10 @@ type CrudCommand struct {
 	FlagCommand
 }
 
+const (
+	CRUDOperation = "o" // CRUDOperation: unique operation flag
+)
+
 func (c *CrudCommand) New() {
 	c.Name = "crud"
 	c.Identifiers = []string{"crud", "crud-second"}
@@ -28,21 +31,21 @@ func (c *CrudCommand) New() {
 		FlagPrefix:       []string{"c", "create"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
-		MEGroup:          []string{"o"},
+		MEGroup:          []string{CRUDOperation},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "read",
 		FlagPrefix:       []string{"r", "read"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
-		MEGroup:          []string{"o"},
+		MEGroup:          []string{CRUDOperation},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "delete",
 		FlagPrefix:       []string{"d", "delete"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
-		MEGroup:          []string{"o"},
+		MEGroup:          []string{CRUDOperation},
 	})
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "free",
@@ -107,20 +110,34 @@ func (c *CrudCommand) Do(a ...any) error {
 		//debug
 		fmt.Println("Inserted message: " + m.ID)
 	} else if _, ok := c.FlagArgstatMaps["read"]; ok {
-		var singleResult *mongo.SingleResult
-		if singleResult = data.GetCollection("test_crud").FindOne(context.TODO(), bson.M{"authorid": m.Author.ID}); singleResult.Err() != nil {
-			if singleResult.Err() == mongo.ErrNoDocuments {
-				clients.DgSession.ChannelMessageSend(m.ChannelID, "Unable to find any testStruct for the given userID!")
+		//single struct
+		/*
+			var singleResult *mongo.SingleResult
+			if singleResult = data.GetCollection("test_crud").FindOne(context.TODO(), bson.M{"authorid": m.Author.ID}); singleResult.Err() != nil {
+				if singleResult.Err() == mongo.ErrNoDocuments {
+					clients.DgSession.ChannelMessageSend(m.ChannelID, "Unable to find any testStruct for the given userID!")
+				}
+				fmt.Println("Unable to find any doc for authorid:" + m.Author.ID)
+				return errors.Wrap(singleResult.Err(), "Doc query failed")
 			}
-			fmt.Println("Unable to find any doc for authorid:" + m.Author.ID)
-			return errors.Wrap(singleResult.Err(), "Doc query failed")
+			var doc CrudTestStruct
+			if err := singleResult.Decode(&doc); err != nil {
+				fmt.Println("Unable to Decode doc into TestCrudStruct")
+				return errors.Wrap(err, "Decode doc failed")
+			}
+		*/
+		//multiple Struct
+		findOpts := options.Find().SetSort(bson.D{{"msgtimestamp", 1}})
+		findCursor, err := data.GetCollection("test_crud").Find(context.TODO(), bson.M{"authorid": m.Author.ID}, findOpts)
+		var results []*CrudTestStruct
+		if err = findCursor.All(context.TODO(), &results); err != nil {
+			fmt.Println("ERROR:" + err.Error())
+			return err
 		}
-		var doc CrudTestStruct
-		if err := singleResult.Decode(&doc); err != nil {
-			fmt.Println("Unable to Decode doc into TestCrudStruct")
-			return errors.Wrap(err, "Decode doc failed")
+		for _, result := range results {
+			fmt.Printf("Result: %v\r\n", result)
 		}
-		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found a Doc:%v", doc))
+		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%v", results))
 	}
 	if err := clients.DgSession.MessageReactionAdd(m.ChannelID, m.ID, "\u2705"); err != nil {
 		fmt.Println("Error reacting: " + err.Error())
