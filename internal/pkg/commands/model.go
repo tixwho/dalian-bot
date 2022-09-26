@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"errors"
 	"fmt"
 	"github.com/kballard/go-shellquote"
 	"regexp"
@@ -75,21 +74,20 @@ type IArgCommand interface {
 }
 
 type ArgCommand struct {
-	Args []string
 }
 
-func (cm *ArgCommand) SeparateArgs(content, separator string) int {
-	cm.Args = strings.Split(content, separator)
+func (cm *ArgCommand) SeparateArgs(content, separator string) ([]string, int) {
+	args := strings.Split(content, separator)
 	j := 0
-	for _, v := range cm.Args {
+	for _, v := range args {
 		//delete the element if the string is empty after trim
 		if vTrim := strings.TrimSpace(v); vTrim != "" {
-			cm.Args[j] = vTrim
+			args[j] = vTrim
 			j++
 		}
 	}
-	cm.Args = cm.Args[:j]
-	return len(cm.Args)
+	args = args[:j]
+	return args, len(args)
 }
 
 type IFlagCommand interface {
@@ -105,23 +103,23 @@ type CommandFlag struct {
 
 type FlagCommand struct {
 	// FlagArgstatMaps: flag name : ?args required
-	FlagArgstatMaps  map[string][]string
 	AvailableFlagMap map[string]*CommandFlag
 }
 
-func (cm *FlagCommand) ParseFlags(content string) error {
+type FlagArgstatMaps map[string][]string
+
+func (cm *FlagCommand) ParseFlags(content string) (FlagArgstatMaps, error) {
 	//0. initialize map
 	flagMap := make(map[string][]string)
 	//1. separate
 	// todo: make flags compatible with commands with multiple arguments.
 	temp, err := shellquote.Split(content)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	//if no flags ever present
 	if len(temp) == 1 {
-		cm.FlagArgstatMaps = flagMap
-		return nil
+		return flagMap, nil
 	}
 	//skipping first bloc
 	for i := 1; i < len(temp); i++ {
@@ -143,32 +141,31 @@ func (cm *FlagCommand) ParseFlags(content string) error {
 			}
 		}
 	}
-	cm.FlagArgstatMaps = flagMap
-	return nil
+	return flagMap, nil
 }
 
-func (cm *FlagCommand) ValidateFlagMap() error {
+func (cm *FlagCommand) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMaps, error) {
 	tempMEMap := make(map[string]CommandFlag)
 	validatedArgStatMaps := make(map[string][]string)
-	for priKey, priExtra := range cm.FlagArgstatMaps {
+	for priKey, priExtra := range flagMaps {
 		//first check if the flag exist
 		if entry, ok := cm.AvailableFlagMap[priKey]; !ok {
-			return errors.New(fmt.Sprintf("Unknown flag:[%s]", priKey))
+			return nil, fmt.Errorf("Unknown flag:[%s]", priKey)
 		} else {
 			//checking extra arg status
 			if !entry.AcceptsExtraArg && len(priExtra) > 0 {
-				return errors.New(fmt.Sprintf("Flag [%s] does NOT allow ANY extra argument", entry.Name))
+				return nil, fmt.Errorf("Flag [%s] does NOT allow ANY extra argument", entry.Name)
 			}
 			//checking number of extra arg allowed
 			//i
 			if !entry.MultipleExtraArg && len(priExtra) > 1 {
-				return errors.New(fmt.Sprintf("Flag [%s] allow exactly ONE extra argument", entry.Name))
+				return nil, fmt.Errorf("Flag [%s] allow exactly ONE extra argument", entry.Name)
 			}
 			//checking ME status
 			for _, v := range entry.MEGroup {
 				//CommandFlag of the same ME group must NOT present in the temporary validation map.
 				if occupiedFlag, ok := tempMEMap[v]; ok {
-					return errors.New(fmt.Sprintf("Flag [%s] is mutually exclusive w/ flag [%s]||ME Group Lock [%s]", entry.Name, occupiedFlag.Name, v))
+					return nil, fmt.Errorf("Flag [%s] is mutually exclusive w/ flag [%s]||ME Group Lock [%s]", entry.Name, occupiedFlag.Name, v)
 				}
 				//validation passed. adding it to temporary ME map for future validation
 				tempMEMap[v] = *entry
@@ -182,15 +179,15 @@ func (cm *FlagCommand) ValidateFlagMap() error {
 				//alias used, need to examine number of extra argument
 				tempExtraArr := append(currentFlagExtraArg, priExtra...)
 				if !entry.MultipleExtraArg && len(tempExtraArr) > 1 {
-					return errors.New(fmt.Sprintf("Flag [%s] does NOT allow ANY extra argument", entry.Name))
+					return nil, fmt.Errorf("Flag [%s] does NOT allow ANY extra argument", entry.Name)
 				}
 				validatedArgStatMaps[entry.Name] = tempExtraArr
 			}
 		}
-		cm.FlagArgstatMaps = validatedArgStatMaps
+
 	}
 	// All examination passed!
-	return nil
+	return validatedArgStatMaps, nil
 }
 
 func (cm *FlagCommand) RegisterCommandFlag(theFlag CommandFlag) error {

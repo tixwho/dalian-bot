@@ -3,6 +3,7 @@ package commands
 import (
 	"dalian-bot/internal/pkg/clients"
 	"dalian-bot/internal/pkg/data"
+	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"go.mongodb.org/mongo-driver/bson"
@@ -29,6 +30,13 @@ func (c *CrudCommand) New() {
 	c.RegisterCommandFlag(CommandFlag{
 		Name:             "create",
 		FlagPrefix:       []string{"c", "create"},
+		AcceptsExtraArg:  false,
+		MultipleExtraArg: false,
+		MEGroup:          []string{CRUDOperation},
+	})
+	c.RegisterCommandFlag(CommandFlag{
+		Name:             "update",
+		FlagPrefix:       []string{"u", "update"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{CRUDOperation},
@@ -92,24 +100,28 @@ func (c *CrudCommand) Match(a ...any) bool {
 
 func (c *CrudCommand) Do(a ...any) error {
 	m := a[0].(*discordgo.MessageCreate)
+	args, argCount := c.SeparateArgs(m.Content, Separator)
 	/* Handle Flags */
-	if err := c.ParseFlags(m.Message.Content); err != nil {
+
+	flagMap, err := c.ParseFlags(m.Message.Content)
+	if err != nil {
 		fmt.Println(err)
 		return err
 	}
-	if err := c.ValidateFlagMap(); err != nil {
+	flagMap, err = c.ValidateFlagMap(flagMap)
+	if err != nil {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, err.Error())
 		return err
 	}
 	/* Flag parsed without error. Now follows various actions. */
-	if _, ok := c.FlagArgstatMaps["free"]; ok {
-		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r %v", c.FlagArgstatMaps))
+	if _, ok := flagMap["free"]; ok {
+		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Successfully read arguments w/ flag! \r %v", flagMap))
 	}
-	if _, ok := c.FlagArgstatMaps["create"]; ok {
+	if _, ok := flagMap["create"]; ok {
 		data.GetCollection("test_crud").InsertOne(context.TODO(), newTestStruct(m))
 		//debug
 		fmt.Println("Inserted message: " + m.ID)
-	} else if _, ok := c.FlagArgstatMaps["read"]; ok {
+	} else if _, ok := flagMap["read"]; ok {
 		//single struct
 		/*
 			var singleResult *mongo.SingleResult
@@ -138,6 +150,26 @@ func (c *CrudCommand) Do(a ...any) error {
 			fmt.Printf("Result: %v\r\n", result)
 		}
 		clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%v", results))
+	} else if _, ok := flagMap["update"]; ok {
+		if argCount < 2 {
+			return errors.New("need another arg to perform update")
+		}
+
+		updateManyFilter := bson.M{"channelid": m.ChannelID}
+		updateManySet := bson.M{"$set": bson.M{"msginfo": fmt.Sprintf("%s:updated:%s", args[1], time.Now().String())}}
+		updateManyResult, err := data.GetCollection("test_crud").UpdateMany(context.TODO(), updateManyFilter, updateManySet)
+		if err != nil {
+			fmt.Println("ERROR:" + err.Error())
+			return err
+		} else {
+			clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf(
+				"matched: %d  modified: %d  upserted: %d  upsertedID: %v\n",
+				updateManyResult.MatchedCount,
+				updateManyResult.ModifiedCount,
+				updateManyResult.UpsertedCount,
+				updateManyResult.UpsertedID,
+			))
+		}
 	}
 	if err := clients.DgSession.MessageReactionAdd(m.ChannelID, m.ID, "\u2705"); err != nil {
 		fmt.Println("Error reacting: " + err.Error())

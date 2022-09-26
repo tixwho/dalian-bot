@@ -33,11 +33,12 @@ func (cm *FixedImageCommand) Match(a ...any) bool {
 
 func (cm *FixedImageCommand) Do(a ...any) error {
 	m := a[0].(*discordgo.MessageCreate)
-	if argCount := cm.SeparateArgs(m.Message.Content, Separator); argCount <= 1 {
+	args, argCount := cm.SeparateArgs(m.Message.Content, Separator)
+	if argCount <= 1 {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "not enough arguments!")
 		return nil
 	}
-	if v, ok := cm.imageMap[cm.Args[1]]; !ok {
+	if v, ok := cm.imageMap[args[1]]; !ok {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "unknown emote argument!")
 		return nil
 	} else {
