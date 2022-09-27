@@ -1,3 +1,5 @@
+// Package clients the package store lower level clients for different services
+// ideally, you will want to avoid directly using clients here without a good reason.
 package clients
 
 import (

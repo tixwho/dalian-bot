@@ -1,3 +1,6 @@
+/*
+Package commands includes all interfaces, strucs and implementations of various discord commands.
+*/
 package commands
 
 import (
@@ -7,41 +10,62 @@ import (
 	"strings"
 )
 
+// Prefix Designated prefix for regular text command
 var Prefix string
+
+// Separator Designated separator for separating arguments
 var Separator string
 
+// SetPrefix Set the global prefix for regular text command.
 func SetPrefix(prefix string) {
 	Prefix = prefix
 }
 
+// SetSeparator Set the global separator for regular text command.
 func SetSeparator(separator string) {
 	Separator = separator
 }
 
+// ICommand The highest level interface for all commands
 type ICommand interface {
+	// New All command must have a valid pointer initialization method
 	New()
+	// Match All command should run when specific event is macthed
+	// a anything you may need to match. It is your OWN responsibility to validate before use.
 	Match(a ...any) bool
+	// Do All command wlll do something
+	// a anything you may need to execute. It is your OWN responsibility to validate before use.
 	Do(a ...any) error
+	// GetName All command must have a name (unique identifier)
 	GetName() string
 }
 
+// Command Basic command struct with no function
 type Command struct {
 	Name string
 }
 
+// GetName Return the name (unique identifier) of the command.
 func (cm *Command) GetName() string {
 	return cm.Name
 }
 
+// ITextCommand Text command triggers when a specific text is detected
 type ITextCommand interface {
 	ICommand
-	MatchMessage(content string) (bool, string)
+	// MatchMessage Match a content for a given logic.
+	// isMatched Whether the content matches the logic or nog
+	// matchWhat Which part is matched, useful when matching multiple features
+	MatchMessage(content string) (isMatched bool, matchedWhat string)
 }
 
+// PlainCommand the most common type of command
+// start with global identifier, have one or more arguments
 type PlainCommand struct {
 	Identifiers []string
 }
 
+// MatchMessage Embedded match method for PlainCommand
 func (cm *PlainCommand) MatchMessage(content string) (bool, string) {
 	for _, v := range cm.Identifiers {
 		//must be a perfect match before the first space
@@ -52,16 +76,22 @@ func (cm *PlainCommand) MatchMessage(content string) (bool, string) {
 	return false, ""
 }
 
-type IImplicitTextCommand interface {
+// IRegexTextCommand Complicated TextCommand, using Regex to match
+// Grants possibility of NOT using identifiers and perform advanced macthing actions.
+type IRegexTextCommand interface {
 	ICommand
-	RegMatchMessage(content string) (bool, regexp.Regexp)
+	// RegMatchMessage matching given content with one or more Regex expression given.
+	RegMatchMessage(content string) (isMatched bool, matchedRegex regexp.Regexp)
 }
 
-type ImplicitCommand struct {
+// RegexTextCommand Functional structure of regex command
+// embeds one or multiple regex expression(s) for matching purposes.
+type RegexTextCommand struct {
 	RegexExpressions []*regexp.Regexp
 }
 
-func (cm *ImplicitCommand) RegMatchMessage(content string) (bool, regexp.Regexp) {
+// RegMatchMessage Embedded match method for RegexTextCommand
+func (cm *RegexTextCommand) RegMatchMessage(content string) (bool, regexp.Regexp) {
 	for _, reg := range cm.RegexExpressions {
 		if reg.MatchString(content) {
 			return true, *reg
@@ -70,12 +100,18 @@ func (cm *ImplicitCommand) RegMatchMessage(content string) (bool, regexp.Regexp)
 	return false, regexp.Regexp{}
 }
 
+// IArgCommand Text commands with multiple arguments
 type IArgCommand interface {
+	SeparateArgs(content, separator string) (args []string, argCount int)
 }
 
+// ArgCommand Functional strucutre of multi-args comand
+// embeds a default splitting method for multiple args
 type ArgCommand struct {
 }
 
+// SeparateArgs separate a long string into different args
+// when no extra args provided, the string shoud len(1)
 func (cm *ArgCommand) SeparateArgs(content, separator string) ([]string, int) {
 	args := strings.Split(content, separator)
 	j := 0
@@ -90,9 +126,13 @@ func (cm *ArgCommand) SeparateArgs(content, separator string) ([]string, int) {
 	return args, len(args)
 }
 
+// IFlagCommand Text commands enabling linux flag-like inputs
 type IFlagCommand interface {
+	ParseFlags(content string) (FlagArgstatMaps, error)
+	ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMaps, error)
 }
 
+// CommandFlag basic structure for handling command flags
 type CommandFlag struct {
 	Name             string   // Flag name
 	FlagPrefix       []string // Flag prefix(s)
@@ -101,18 +141,22 @@ type CommandFlag struct {
 	MEGroup          []string // Mutually exclusive group
 }
 
+// FlagCommand Functional structure for flag handling
 type FlagCommand struct {
 	// FlagArgstatMaps: flag name : ?args required
 	AvailableFlagMap map[string]*CommandFlag
 }
 
+// FlagArgstatMaps Defined structure for storing flag info for a given trigger
 type FlagArgstatMaps map[string][]string
 
+// ParseFlags read the input flag from given text message.
+// Does NOT handle the validation part,only return err if the input is invalid structuralwise
+// Will produce unexpected result if using with multiple args command, sanitize before calling.
 func (cm *FlagCommand) ParseFlags(content string) (FlagArgstatMaps, error) {
 	//0. initialize map
 	flagMap := make(map[string][]string)
 	//1. separate
-	// todo: make flags compatible with commands with multiple arguments.
 	temp, err := shellquote.Split(content)
 	if err != nil {
 		return nil, err
@@ -144,6 +188,7 @@ func (cm *FlagCommand) ParseFlags(content string) (FlagArgstatMaps, error) {
 	return flagMap, nil
 }
 
+// ValidateFlagMap handle the validation of flags for a given flag command.
 func (cm *FlagCommand) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMaps, error) {
 	tempMEMap := make(map[string]CommandFlag)
 	validatedArgStatMaps := make(map[string][]string)
@@ -190,6 +235,7 @@ func (cm *FlagCommand) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMap
 	return validatedArgStatMaps, nil
 }
 
+// RegisterCommandFlag register an valid flag for the flag command.
 func (cm *FlagCommand) RegisterCommandFlag(theFlag CommandFlag) error {
 	for _, v := range theFlag.FlagPrefix {
 		cm.AvailableFlagMap[v] = &theFlag
@@ -197,7 +243,8 @@ func (cm *FlagCommand) RegisterCommandFlag(theFlag CommandFlag) error {
 	return nil
 }
 
-func tryInsertFlagMap(kvPair [2]string, flagMap map[string][]string) {
+// tryInsertFlagMap Supportive function for parsing flags from text.
+func tryInsertFlagMap(kvPair [2]string, flagMap FlagArgstatMaps) {
 	if v, ok := flagMap[kvPair[0]]; ok {
 		//only add arguments to flags w/ extra args.
 		if kvPair[1] != "" {
@@ -211,8 +258,4 @@ func tryInsertFlagMap(kvPair [2]string, flagMap map[string][]string) {
 			flagMap[kvPair[0]] = []string{}
 		}
 	}
-}
-
-type IStagedListener interface {
-	nextStage()
 }

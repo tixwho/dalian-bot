@@ -34,8 +34,8 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 				return
 			}
 		}
-		//after that, test ImplicitCommand
-		if inCommand, ok := v.(IImplicitTextCommand); ok {
+		//after that, test RegexTextCommand
+		if inCommand, ok := v.(IRegexTextCommand); ok {
 			if inCommand.Match(m) {
 				inCommand.Do(m)
 				//stop right there

@@ -44,7 +44,7 @@ func (cm *FixedImageCommand) Do(a ...any) error {
 	} else {
 		if f, err := os.Open(v); err == nil {
 			defer f.Close()
-			err := discord.SendFile(m.ChannelID, f.Name(), f)
+			err := discord.ChannelFileSend(m.ChannelID, f.Name(), f)
 			return err
 		}
 	}

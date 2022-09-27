@@ -9,7 +9,7 @@ import (
 
 type WhatCommand struct {
 	Command
-	ImplicitCommand
+	RegexTextCommand
 }
 
 func (cm *WhatCommand) New() {

@@ -14,7 +14,7 @@ type AskCommand struct {
 	//handle the trigger event
 	PlainCommand
 	//handle subsequent steps
-	ImplicitCommand
+	RegexTextCommand
 	//channel:asking
 	ActiveAsks map[string]*AskStage
 }
