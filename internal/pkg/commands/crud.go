@@ -102,8 +102,7 @@ func (c *CrudCommand) Do(a ...any) error {
 	m := a[0].(*discordgo.MessageCreate)
 	args, argCount := c.SeparateArgs(m.Content, Separator)
 	/* Handle Flags */
-
-	flagMap, err := c.ParseFlags(m.Message.Content)
+	flagMap, err := c.ParseFlags(args[0])
 	if err != nil {
 		fmt.Println(err)
 		return err
