@@ -8,6 +8,7 @@ import (
 	"github.com/kballard/go-shellquote"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // Prefix Designated prefix for regular text command
@@ -285,4 +286,16 @@ func (b BotCallingCommand) IsCallingBot(content string) (isCalling bool, sanitiz
 		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
 	}
 	return false, ""
+}
+
+// BasicStageInfo Include shared information for staged actions
+type BasicStageInfo struct {
+	ChannelID      string
+	UserID         string
+	StageNow       int
+	LastActionTime time.Time
+}
+
+type IStage interface {
+	process()
 }

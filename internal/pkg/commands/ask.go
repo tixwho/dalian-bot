@@ -20,48 +20,44 @@ type AskCommand struct {
 }
 
 type AskStage struct {
-	UserId         string
-	ChannelId      string
-	AskStage       int
-	ProcessChan    chan *discordgo.Message
+	BasicStageInfo
+	ProcessMsgChan chan *discordgo.Message
 	MainCommand    *AskCommand
-	LastActionTime time.Time
 }
 
 func (as *AskStage) new(ms *discordgo.MessageCreate, cm *AskCommand) {
-	as.UserId = ms.Author.ID
-	as.ChannelId = ms.ChannelID
-	as.AskStage = 0
+	as.UserID = ms.Author.ID
+	as.ChannelID = ms.ChannelID
+	as.StageNow = 0
 	as.LastActionTime = ms.Timestamp
 	as.MainCommand = cm
 }
 
-func (as *AskStage) process(command *AskCommand) {
-	clients.DgSession.ChannelMessageSend(as.ChannelId, "Ask count started in new goroutine!")
+func (as *AskStage) process() {
+	clients.DgSession.ChannelMessageSend(as.ChannelID, "Ask count started in new goroutine!")
 	func() {
 		for {
 			select {
-			case msg, ok := <-as.ProcessChan:
+			case msg, ok := <-as.ProcessMsgChan:
 				if !ok {
 					//channel closed, a termination sign
 					fmt.Println("terminating through closed channel")
 					return
 				}
 				if callingBot, content := as.MainCommand.IsCallingBot(msg.Content); callingBot && content == "next" {
-					as.AskStage += 1
+					as.StageNow += 1
 					as.LastActionTime = time.Now()
-					clients.DgSession.ChannelMessageSend(msg.ChannelID, fmt.Sprintf("processed! stage:%d", as.AskStage))
+					clients.DgSession.ChannelMessageSend(msg.ChannelID, fmt.Sprintf("processed! stage:%d", as.StageNow))
 				}
 			case <-time.After(15 * time.Second):
 				//overtime termination sign
 				fmt.Println("terminating through overtime")
-				clients.DgSession.ChannelMessageSend(as.ChannelId, "15 seconds overtime")
+				clients.DgSession.ChannelMessageSend(as.ChannelID, "15 seconds overtime")
 				return
 			}
-
 		}
 	}()
-	command.disposeAsk(as.UserId)
+	as.MainCommand.disposeAsk(as.UserID)
 }
 
 func (cm *AskCommand) New() {
@@ -92,30 +88,30 @@ func (cm *AskCommand) Do(a ...any) error {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "Detected another command, force abort")
 		cm.disposeAsk(m.Author.ID)
 	} else if callingBot, _ := cm.IsCallingBot(m.Content); callingBot {
-		aa.ProcessChan <- m.Message
+		aa.ProcessMsgChan <- m.Message
 	}
 	return nil
 }
 
 func (cm *AskCommand) insertAsk(ms *discordgo.MessageCreate) error {
 	if v, ok := cm.ActiveAsks[ms.Author.ID]; ok {
-		return errors.New(fmt.Sprintf("Found an active ask session at stage %d", v.AskStage))
+		return errors.New(fmt.Sprintf("Found an active ask session at stage %d", v.StageNow))
 
 	}
 	var as AskStage
 	as.new(ms, cm)
 	cm.ActiveAsks[ms.Author.ID] = &as
-	as.ProcessChan = make(chan *discordgo.Message, 1)
-	go as.process(cm)
+	as.ProcessMsgChan = make(chan *discordgo.Message, 1)
+	go as.process()
 	fmt.Println("Ask inserted")
 	return nil
 }
 
 func (cm *AskCommand) disposeAsk(userID string) error {
 	if v, ok := cm.ActiveAsks[userID]; !ok {
-		return errors.New("disposing a non-exist AskStage")
+		return errors.New("disposing a non-exist StageNow")
 	} else {
-		close(v.ProcessChan) // this should immediately trigger dispose
+		close(v.ProcessMsgChan) // this should immediately trigger dispose
 	}
 
 	delete(cm.ActiveAsks, userID)
