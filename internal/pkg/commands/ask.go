@@ -13,8 +13,8 @@ type AskCommand struct {
 	Command
 	//handle the trigger event
 	PlainCommand
-	//handle subsequent steps
-	RegexTextCommand
+	//handling subsequent steps
+	BotCallingCommand
 	//channel:asking
 	ActiveAsks map[string]*AskStage
 }
@@ -24,14 +24,16 @@ type AskStage struct {
 	ChannelId      string
 	AskStage       int
 	ProcessChan    chan *discordgo.Message
+	MainCommand    *AskCommand
 	LastActionTime time.Time
 }
 
-func (as *AskStage) new(ms *discordgo.MessageCreate) {
+func (as *AskStage) new(ms *discordgo.MessageCreate, cm *AskCommand) {
 	as.UserId = ms.Author.ID
 	as.ChannelId = ms.ChannelID
 	as.AskStage = 0
 	as.LastActionTime = ms.Timestamp
+	as.MainCommand = cm
 }
 
 func (as *AskStage) process(command *AskCommand) {
@@ -45,7 +47,7 @@ func (as *AskStage) process(command *AskCommand) {
 					fmt.Println("terminating through closed channel")
 					return
 				}
-				if msg.Content == "next" {
+				if callingBot, content := as.MainCommand.IsCallingBot(msg.Content); callingBot && content == "next" {
 					as.AskStage += 1
 					as.LastActionTime = time.Now()
 					clients.DgSession.ChannelMessageSend(msg.ChannelID, fmt.Sprintf("processed! stage:%d", as.AskStage))
@@ -74,7 +76,8 @@ func (cm *AskCommand) Match(a ...any) bool {
 		return false
 	}
 	if _, ok := cm.ActiveAsks[m.Author.ID]; ok {
-		return true
+		matchStatus, _ := cm.IsCallingBot(m.Content)
+		return matchStatus
 	}
 	matchStatus, _ := cm.MatchMessage(m.Message.Content)
 	return matchStatus
@@ -88,7 +91,7 @@ func (cm *AskCommand) Do(a ...any) error {
 	} else if strings.HasPrefix(m.Content, Prefix) {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "Detected another command, force abort")
 		cm.disposeAsk(m.Author.ID)
-	} else if m.Content == "next" {
+	} else if callingBot, _ := cm.IsCallingBot(m.Content); callingBot {
 		aa.ProcessChan <- m.Message
 	}
 	return nil
@@ -100,7 +103,7 @@ func (cm *AskCommand) insertAsk(ms *discordgo.MessageCreate) error {
 
 	}
 	var as AskStage
-	as.new(ms)
+	as.new(ms, cm)
 	cm.ActiveAsks[ms.Author.ID] = &as
 	as.ProcessChan = make(chan *discordgo.Message, 1)
 	go as.process(cm)

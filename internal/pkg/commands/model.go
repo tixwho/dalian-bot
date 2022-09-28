@@ -16,6 +16,9 @@ var Prefix string
 // Separator Designated separator for separating arguments
 var Separator string
 
+// BotID Current id for the bot user, for command identification purpose.
+var BotID string
+
 // SetPrefix Set the global prefix for regular text command.
 func SetPrefix(prefix string) {
 	Prefix = prefix
@@ -24,6 +27,11 @@ func SetPrefix(prefix string) {
 // SetSeparator Set the global separator for regular text command.
 func SetSeparator(separator string) {
 	Separator = separator
+}
+
+// SetBotID Set the BotID of the current bot user.
+func SetBotID(botID string) {
+	BotID = botID
 }
 
 // ICommand The highest level interface for all commands
@@ -258,4 +266,23 @@ func tryInsertFlagMap(kvPair [2]string, flagMap FlagArgstatMaps) {
 			flagMap[kvPair[0]] = []string{}
 		}
 	}
+}
+
+// IBotCallingCommand TextCommand starts with a @bot
+type IBotCallingCommand interface {
+	IsCallingBot(content string) bool
+}
+
+// BotCallingCommand Functional structure for BotCallingCommand
+// embedded a method for identifying @Bot texts
+type BotCallingCommand struct {
+}
+
+// IsCallingBot Return true if the text starts with @{BotID}
+func (b BotCallingCommand) IsCallingBot(content string) (isCalling bool, sanitizedContent string) {
+	callingStr := fmt.Sprintf("<@%s>", BotID)
+	if strings.HasPrefix(content, callingStr) {
+		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
+	}
+	return false, ""
 }

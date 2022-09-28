@@ -50,6 +50,7 @@ func InitDalian() error {
 	/* Dalian specific setups */
 	commands.SetPrefix("$")
 	commands.SetSeparator("$")
+	commands.SetBotID(discordSession.State.User.ID)
 
 	commands.RegisterDiscordHandlers()
 
