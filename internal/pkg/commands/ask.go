@@ -75,7 +75,7 @@ func (cm *AskCommand) Match(a ...any) bool {
 		matchStatus, _ := cm.IsCallingBot(m.Content)
 		return matchStatus
 	}
-	matchStatus, _ := cm.MatchMessage(m.Message.Content)
+	matchStatus, _ := cm.MatchText(m.Message.Content)
 	return matchStatus
 }
 

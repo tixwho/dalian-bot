@@ -94,7 +94,7 @@ func (c *CrudCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := c.MatchMessage(m.Message.Content)
+	matchStatus, _ := c.MatchText(m.Message.Content)
 	return matchStatus
 }
 

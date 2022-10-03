@@ -5,6 +5,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/bwmarrin/discordgo"
 	"github.com/kballard/go-shellquote"
 	"regexp"
 	"strings"
@@ -44,7 +45,8 @@ type ICommand interface {
 	Match(a ...any) bool
 	// Do All command wlll do something
 	// a anything you may need to execute. It is your OWN responsibility to validate before use.
-	Do(a ...any) error
+	// err if anything worth *reporting* happened. expected error should not be returned.
+	Do(a ...any) (err error)
 	// GetName All command must have a name (unique identifier)
 	GetName() string
 }
@@ -59,13 +61,17 @@ func (cm *Command) GetName() string {
 	return cm.Name
 }
 
-// ITextCommand Text command triggers when a specific text is detected
 type ITextCommand interface {
+	MatchMessage(message *discordgo.Message) bool
+}
+
+// IPlainTextCommand Text command triggers when a specific text is detected
+type IPlainTextCommand interface {
 	ICommand
-	// MatchMessage Match a content for a given logic.
+	// MatchText Match a content for a given logic.
 	// isMatched Whether the content matches the logic or nog
 	// matchWhat Which part is matched, useful when matching multiple features
-	MatchMessage(content string) (isMatched bool, matchedWhat string)
+	MatchText(content string) (isMatched bool, matchedWhat string)
 }
 
 // PlainCommand the most common type of command
@@ -74,8 +80,8 @@ type PlainCommand struct {
 	Identifiers []string
 }
 
-// MatchMessage Embedded match method for PlainCommand
-func (cm *PlainCommand) MatchMessage(content string) (bool, string) {
+// MatchText Embedded match method for PlainCommand
+func (cm *PlainCommand) MatchText(content string) (bool, string) {
 	for _, v := range cm.Identifiers {
 		//must be a perfect match before the first space
 		if strings.TrimSpace(strings.Split(content, " ")[0]) == Prefix+v {
@@ -250,6 +256,11 @@ func (cm *FlagCommand) RegisterCommandFlag(theFlag CommandFlag) error {
 		cm.AvailableFlagMap[v] = &theFlag
 	}
 	return nil
+}
+
+// InitAvailableFlagMap default method for initalizing available flag map.
+func (cm *FlagCommand) InitAvailableFlagMap() {
+	cm.AvailableFlagMap = make(map[string]*CommandFlag)
 }
 
 // tryInsertFlagMap Supportive function for parsing flags from text.

@@ -27,7 +27,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	for _, v := range CommandByName {
 		//only test TextCommand for MscCreate events
-		if tCommand, ok := v.(ITextCommand); ok {
+		if tCommand, ok := v.(IPlainTextCommand); ok {
 			if tCommand.Match(m) {
 				tCommand.Do(m)
 				//stop right there.

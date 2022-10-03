@@ -21,7 +21,7 @@ func (cm *PingCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := cm.MatchMessage(m.Message.Content)
+	matchStatus, _ := cm.MatchText(m.Message.Content)
 	return matchStatus
 }
 

@@ -12,6 +12,10 @@ func ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
 	return clients.DgSession.ChannelMessageSend(channelID, content)
 }
 
+func ChannelReportError(channelID string, error error) (*discordgo.Message, error) {
+	return ChannelMessageSend(channelID, error.Error())
+}
+
 // ChannelFileSend send a file to given guild channel.
 // channelID the id of a channel
 // name the display filename to be sent to discord

@@ -21,7 +21,7 @@ func (m *ListCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := m.MatchMessage(msg.Message.Content)
+	matchStatus, _ := m.MatchText(msg.Message.Content)
 	return matchStatus
 }
 
