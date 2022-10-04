@@ -27,18 +27,10 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 	for _, v := range CommandByName {
 		//only test TextCommand for MscCreate events
-		if tCommand, ok := v.(IPlainTextCommand); ok {
-			if tCommand.Match(m) {
-				tCommand.Do(m)
+		if _, ok := v.(ITextCommand); ok {
+			if v.Match(m) {
+				v.Do(m)
 				//stop right there.
-				return
-			}
-		}
-		//after that, test RegexTextCommand
-		if inCommand, ok := v.(IRegexTextCommand); ok {
-			if inCommand.Match(m) {
-				inCommand.Do(m)
-				//stop right there
 				return
 			}
 		}

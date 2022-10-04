@@ -12,6 +12,11 @@ type WhatCommand struct {
 	RegexTextCommand
 }
 
+func (cm *WhatCommand) MatchMessage(message *discordgo.Message) bool {
+	matchStatus, _ := cm.RegMatchMessage(message.Content)
+	return matchStatus
+}
+
 func (cm *WhatCommand) New() {
 	cm.Name = "what"
 	cm.RegexExpressions = []*regexp.Regexp{}
@@ -23,8 +28,7 @@ func (cm *WhatCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := cm.RegMatchMessage(m.Content)
-	return matchStatus
+	return cm.MatchMessage(m.Message)
 }
 
 func (cm *WhatCommand) Do(a ...any) error {

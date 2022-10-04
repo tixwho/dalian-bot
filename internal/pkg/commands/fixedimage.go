@@ -14,6 +14,11 @@ type FixedImageCommand struct {
 	imageMap map[string]string
 }
 
+func (cm *FixedImageCommand) MatchMessage(message *discordgo.Message) bool {
+	matchStatus, _ := cm.MatchText(message.Content)
+	return matchStatus
+}
+
 func (cm *FixedImageCommand) New() {
 	cm.Name = "fixed-image"
 	cm.Identifiers = []string{"fixed-image", "fi"}
@@ -27,8 +32,7 @@ func (cm *FixedImageCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := cm.MatchText(m.Message.Content)
-	return matchStatus
+	return cm.MatchMessage(m.Message)
 }
 
 func (cm *FixedImageCommand) Do(a ...any) error {

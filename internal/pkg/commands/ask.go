@@ -19,6 +19,15 @@ type AskCommand struct {
 	ActiveAsks map[string]*AskStage
 }
 
+func (cm *AskCommand) MatchMessage(message *discordgo.Message) bool {
+	if _, ok := cm.ActiveAsks[message.Author.ID]; ok {
+		matchStatus, _ := cm.IsCallingBot(message.Content)
+		return matchStatus
+	}
+	matchStatus, _ := cm.MatchText(message.Content)
+	return matchStatus
+}
+
 type AskStage struct {
 	BasicStageInfo
 	ProcessMsgChan chan *discordgo.Message
@@ -71,12 +80,7 @@ func (cm *AskCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	if _, ok := cm.ActiveAsks[m.Author.ID]; ok {
-		matchStatus, _ := cm.IsCallingBot(m.Content)
-		return matchStatus
-	}
-	matchStatus, _ := cm.MatchText(m.Message.Content)
-	return matchStatus
+	return cm.MatchMessage(m.Message)
 }
 
 func (cm *AskCommand) Do(a ...any) error {

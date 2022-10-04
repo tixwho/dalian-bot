@@ -19,6 +19,11 @@ type CrudCommand struct {
 	FlagCommand
 }
 
+func (c *CrudCommand) MatchMessage(message *discordgo.Message) bool {
+	matchStatus, _ := c.MatchText(message.Content)
+	return matchStatus
+}
+
 const (
 	CRUDOperation = "o" // CRUDOperation: unique operation flag
 )
@@ -94,8 +99,7 @@ func (c *CrudCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := c.MatchText(m.Message.Content)
-	return matchStatus
+	return c.MatchMessage(m.Message)
 }
 
 func (c *CrudCommand) Do(a ...any) error {

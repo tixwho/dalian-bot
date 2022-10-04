@@ -11,6 +11,11 @@ type PingCommand struct {
 	PlainCommand
 }
 
+func (cm *PingCommand) MatchMessage(message *discordgo.Message) bool {
+	matchStatus, _ := cm.MatchText(message.Content)
+	return matchStatus
+}
+
 func (cm *PingCommand) New() {
 	cm.Name = "ping"
 	cm.Identifiers = []string{"ping"}
@@ -21,8 +26,7 @@ func (cm *PingCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := cm.MatchText(m.Message.Content)
-	return matchStatus
+	return cm.MatchMessage(m.Message)
 }
 
 func (cm *PingCommand) Do(a ...any) error {

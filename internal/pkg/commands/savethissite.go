@@ -38,6 +38,31 @@ type SaveThisSiteCommand struct {
 	ActiveSitetageMap activeSitestageMap
 }
 
+func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.Message) bool {
+	//manual
+	if matchStatus, _ := cm.MatchText(m.Content); matchStatus {
+		return true
+	}
+	//stage progress
+	if isCallingBot, _ := cm.IsCallingBot(m.Content); isCallingBot {
+		//a stage present, check if it's a stage info
+		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m)]; ok {
+			return true
+		}
+
+	}
+	//implicit
+	if _, err := url.ParseRequestURI(m.Content); err == nil {
+		//go through active stages to make sure no other in process
+		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m)]; ok {
+			discord.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
+			return false
+		}
+		return true
+	}
+	return false
+}
+
 type combinedKey string
 
 type activeSitestageMap map[combinedKey]*saveSiteStage
@@ -201,28 +226,7 @@ func (cm *SaveThisSiteCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	//manual
-	if matchStatus, _ := cm.MatchText(m.Content); matchStatus {
-		return true
-	}
-	//stage progress
-	if isCallingBot, _ := cm.IsCallingBot(m.Content); isCallingBot {
-		//a stage present, check if it's a stage info
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
-			return true
-		}
-
-	}
-	//implicit
-	if _, err := url.ParseRequestURI(m.Content); err == nil {
-		//go through active stages to make sure no other in process
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
-			discord.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
-			return false
-		}
-		return true
-	}
-	return false
+	return cm.MatchMessage(m.Message)
 }
 
 func (cm *SaveThisSiteCommand) Do(a ...any) error {

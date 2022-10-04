@@ -11,6 +11,11 @@ type ListCommand struct {
 	PlainCommand
 }
 
+func (m *ListCommand) MatchMessage(message *discordgo.Message) bool {
+	matchStatus, _ := m.MatchText(message.Content)
+	return matchStatus
+}
+
 func (m *ListCommand) New() {
 	m.Name = "list"
 	m.Identifiers = []string{"list", "l"}
@@ -21,8 +26,7 @@ func (m *ListCommand) Match(a ...any) bool {
 	if !isMsgCreate {
 		return false
 	}
-	matchStatus, _ := m.MatchText(msg.Message.Content)
-	return matchStatus
+	return m.MatchMessage(msg.Message)
 }
 
 func (m *ListCommand) Do(a ...any) error {
