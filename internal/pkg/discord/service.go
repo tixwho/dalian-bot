@@ -12,6 +12,10 @@ func ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
 	return clients.DgSession.ChannelMessageSend(channelID, content)
 }
 
+func ChannelMessageSendEmbed(channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+	return clients.DgSession.ChannelMessageSendEmbed(channelID, embed)
+}
+
 func ChannelReportError(channelID string, error error) (*discordgo.Message, error) {
 	return ChannelMessageSend(channelID, error.Error())
 }

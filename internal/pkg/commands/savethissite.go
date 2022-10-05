@@ -249,6 +249,9 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 			discord.ChannelReportError(m.ChannelID, err)
 			return nil
 		}
+		if _, debugStatus := flagMap["debug"]; debugStatus {
+			discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("flagMap:%v", flagMap))
+		}
 		//execute command body
 		switch matchedCommand {
 		case "save-site":
@@ -281,8 +284,8 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 		case "list-site":
 			query := bson.M{"user_id": m.Author.ID, "guild_id": m.GuildID}
 			//optional url
-			if len(flagMap["tags"]) > 0 {
-				if flagMap["tags"][0] == "-" {
+			if len(flagMap["tag"]) > 0 {
+				if flagMap["tag"][0] == "-" {
 					query["tags"] = nil
 				} else {
 					query["tags"] = bson.M{"$all": flagMap["tag"]}
@@ -295,10 +298,11 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 				fmt.Println("ERROR:" + err.Error())
 				return err
 			}
-			for _, result := range results {
-				fmt.Printf("Result: %v\r\n", result)
+			// clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%s", results.digestInfo()))
+			_, err = discord.ChannelMessageSendEmbed(m.ChannelID, newListSiteEmbed(results))
+			if err != nil {
+				fmt.Println(err)
 			}
-			clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%s", results.digestInfo()))
 		}
 
 	}
@@ -335,6 +339,9 @@ type SitePO struct {
 	Site string   `bson:"site"`
 	Tags []string `bson:"tags"`
 	Note string   `bson:"note"`
+	//Retrieved Info
+	Title       string `bson:"title"`
+	SnapshotURL string `bson:"snapshot_url,omitempty"`
 	//Credential Info
 	GuildID   string `bson:"guild_id"`
 	ChannelID string `bson:"channel_id"`
@@ -365,9 +372,28 @@ func (sp *SitePO) essentialInfo() string {
 	} else {
 		note = sp.Note
 	}
-	essentialInfo := "> Site:%s\r" +
-		"> Tags:%s\r" +
-		"> Note:%s"
+	essentialInfo := "> Site: %s\r" +
+		"> Tags: %s\r" +
+		"> Note: %s"
+	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
+}
+
+func (sp *SitePO) essentialInfoForEmbed() string {
+	var tags, note string
+	if len(sp.Tags) == 0 {
+		tags = "*None*"
+	} else {
+		tags = "[" + strings.Join(sp.Tags, ",") + "]"
+	}
+
+	if sp.Note == "" {
+		note = "*None*"
+	} else {
+		note = sp.Note
+	}
+	essentialInfo := "%s\r" +
+		"Tags: %s\r" +
+		" Note: %s"
 	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
 }
 
@@ -419,8 +445,28 @@ func (arr sitePoArr) digestInfo() string {
 	for _, v := range arr {
 		info += "\r" + v.essentialInfo() + "\r"
 	}
-	info = fmt.Sprintf("{%s\r}", info)
+	info = fmt.Sprintf("{%s}", info)
 	return info
+}
+
+func newListSiteEmbed(arr sitePoArr) *discordgo.MessageEmbed {
+	embed := &discordgo.MessageEmbed{
+		Title:       "ls result",
+		Description: fmt.Sprintf("Your query rendered %d results.", len(arr)),
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Color:       0x33acff,
+		Fields:      nil,
+	}
+	var fields []*discordgo.MessageEmbedField
+	for _, sitePo := range arr {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   fmt.Sprintf("Temporary Title"),
+			Value:  sitePo.essentialInfoForEmbed(),
+			Inline: false,
+		})
+	}
+	embed.Fields = fields
+	return embed
 }
 
 func init() {
