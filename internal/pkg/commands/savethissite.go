@@ -8,6 +8,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
@@ -176,7 +177,7 @@ func (s *saveSiteStage) process() {
 					}
 					persistSitePo(sitePo, true)
 					//TODO more elegant display
-					discord.ChannelMessageSend(s.ChannelID, fmt.Sprintf("Site saved: %s", sitePo.essentialInfo()))
+					discord.ChannelMessageSend(s.ChannelID, fmt.Sprintf("Site saved: \r%s", sitePo.essentialInfo()))
 					return
 				}
 			case <-time.After(time.Duration(stageOvertime) * time.Second):
@@ -192,7 +193,7 @@ func (s *saveSiteStage) process() {
 
 func (cm *SaveThisSiteCommand) New() {
 	cm.Name = "save-this-site"
-	cm.Identifiers = []string{"save-site"}
+	cm.Identifiers = []string{"save-site", "list-site"}
 	cm.ActiveSitetageMap = make(map[combinedKey]*saveSiteStage)
 	cm.RegexExpressions = []*regexp.Regexp{}
 	cm.RegexExpressions = append(cm.RegexExpressions, regexp.MustCompile(websiteRegex))
@@ -233,18 +234,9 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 	m := a[0].(*discordgo.MessageCreate)
 
 	//first check manual
-	if matchStatus, _ := cm.MatchText(m.Content); matchStatus {
-		//one-step insertion, or list / other operations
+	//one-step insertion, or list / other operations
+	if matchStatus, matchedCommand := cm.MatchText(m.Content); matchStatus {
 		args, length := cm.SeparateArgs(m.Content, Separator)
-		//make sure arg[1] has a valid url
-		if length <= 1 {
-			discord.ChannelMessageSend(m.ChannelID, "You need an url as the second argument!")
-			return nil
-		}
-		if _, err := url.ParseRequestURI(args[1]); err != nil {
-			discord.ChannelMessageSend(m.ChannelID, "The second argument must be a VALID url!")
-			return nil
-		}
 		//read the flags
 		flagMap, err := cm.ParseFlags(args[0])
 		if err != nil {
@@ -257,23 +249,58 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 			discord.ChannelReportError(m.ChannelID, err)
 			return nil
 		}
-		//validation passed, start the logic
-		sitePO := newRawSitePO(m.Message)
-		//set site
-		sitePO.Site = args[1]
-		//set tags
-		if len(flagMap["tag"]) > 0 {
-			sitePO.Tags = flagMap["tag"]
+		//execute command body
+		switch matchedCommand {
+		case "save-site":
+			//make sure arg[1] has a valid url
+			if length <= 1 {
+				discord.ChannelMessageSend(m.ChannelID, "You need an url as the second argument!")
+				return nil
+			}
+			if _, err := url.ParseRequestURI(args[1]); err != nil {
+				discord.ChannelMessageSend(m.ChannelID, "The second argument must be a VALID url!")
+				return nil
+			}
+			//validation passed, start the logic
+			sitePO := newRawSitePO(m.Message)
+			//set site
+			sitePO.Site = args[1]
+			//set tags
+			if len(flagMap["tag"]) > 0 {
+				sitePO.Tags = flagMap["tag"]
+			}
+			//set note
+			if len(flagMap["note"]) > 0 {
+				sitePO.Note = flagMap["note"][0]
+			}
+			//save it to the database
+			go persistSitePo(sitePO, true)
+			discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
+			//no subsequent check
+			return nil
+		case "list-site":
+			query := bson.M{"user_id": m.Author.ID, "guild_id": m.GuildID}
+			//optional url
+			if len(flagMap["tags"]) > 0 {
+				if flagMap["tags"][0] == "-" {
+					query["tags"] = nil
+				} else {
+					query["tags"] = bson.M{"$all": flagMap["tag"]}
+				}
+			}
+			findOpts := options.Find().SetSort(bson.D{{"id", -1}})
+			findCursor, err := data.GetCollection("site_collection").Find(context.TODO(), query, findOpts)
+			var results sitePoArr
+			if err = findCursor.All(context.TODO(), &results); err != nil {
+				fmt.Println("ERROR:" + err.Error())
+				return err
+			}
+			for _, result := range results {
+				fmt.Printf("Result: %v\r\n", result)
+			}
+			clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%s", results.digestInfo()))
 		}
-		//set note
-		if len(flagMap["note"]) > 0 {
-			sitePO.Note = flagMap["note"][0]
-		}
-		//save it to the database
-		go persistSitePo(sitePO, true)
-		discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
-		//no subsequent check
-		return nil
+
 	}
 
 	//then check implicit
@@ -301,18 +328,20 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 }
 
 type SitePO struct {
+	//Reserved
+	ID_ primitive.ObjectID `bson:"_id"`
 	//Display Info
-	ID   int
-	Site string
-	Tags []string
-	Note string
+	ID   int      `bson:"id"`
+	Site string   `bson:"site"`
+	Tags []string `bson:"tags"`
+	Note string   `bson:"note"`
 	//Credential Info
-	GuildID   string
-	ChannelID string
-	UserID    string
+	GuildID   string `bson:"guild_id"`
+	ChannelID string `bson:"channel_id"`
+	UserID    string `bson:"user_id"`
 	//Auditing info
-	CreatedTime      time.Time
-	LastModifiedTime time.Time
+	CreatedTime      time.Time `bson:"created_time"`
+	LastModifiedTime time.Time `bson:"last_modified_time"`
 }
 
 func (sp *SitePO) setTime(isCreate bool) {
@@ -332,13 +361,13 @@ func (sp *SitePO) essentialInfo() string {
 	}
 
 	if sp.Note == "" {
-		note = "*None"
+		note = "*None*"
 	} else {
 		note = sp.Note
 	}
 	essentialInfo := "> Site:%s\r" +
-		"Tags:%s\r" +
-		"Note:%s"
+		"> Tags:%s\r" +
+		"> Note:%s"
 	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
 }
 
@@ -381,6 +410,17 @@ func persistSitePo(po SitePO, isCreate bool) error {
 	}
 	//TODO need to get a numerical id first
 	return nil
+}
+
+type sitePoArr []*SitePO
+
+func (arr sitePoArr) digestInfo() string {
+	info := ""
+	for _, v := range arr {
+		info += "\r" + v.essentialInfo() + "\r"
+	}
+	info = fmt.Sprintf("{%s\r}", info)
+	return info
 }
 
 func init() {
