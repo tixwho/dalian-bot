@@ -1,6 +1,6 @@
 module dalian-bot
 
-go 1.18
+go 1.19
 
 require (
 	github.com/bwmarrin/discordgo v0.26.1
