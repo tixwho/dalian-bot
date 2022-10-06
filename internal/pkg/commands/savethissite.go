@@ -8,7 +8,6 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
@@ -125,11 +124,16 @@ type saveSiteStage struct {
 func (s *saveSiteStage) process() {
 	//prep
 	questionPrompt := "Detected the following url:\r" +
-		"> %s\r" +
+		" %s\r" +
 		"Do you wish to add it to SiteCollection? (y/yes/n/no)\r" +
 		"all answers should start with **@%s**, expires in %d seconds"
+	promptEmbed := &discordgo.MessageEmbed{
+		Description: fmt.Sprintf(questionPrompt, s.URL, clients.DgSession.State.User.Username, stageOvertime),
+		Color:       discord.EmbedColorQuestion,
+	}
+
 	//start the prompt
-	discord.ChannelMessageSend(s.ChannelID, fmt.Sprintf(questionPrompt, s.URL, clients.DgSession.State.User.Username, stageOvertime))
+	discord.ChannelMessageSendEmbed(s.ChannelID, promptEmbed)
 	var sitePo SitePO
 	func() {
 		for {
@@ -175,9 +179,19 @@ func (s *saveSiteStage) process() {
 					if content != "-" {
 						sitePo.Note = content
 					}
+					//TODO snapshot things
 					persistSitePo(sitePo, true)
-					//TODO more elegant display
-					discord.ChannelMessageSend(s.ChannelID, fmt.Sprintf("Site saved: \r%s", sitePo.essentialInfo()))
+					discord.ChannelMessageSendEmbed(msg.ChannelID, &discordgo.MessageEmbed{
+						Title:       "Site saved",
+						Description: "The following site has been saved",
+						Timestamp:   time.Now().Format(time.RFC3339),
+						Color:       discord.EmbedColorNormal,
+						Fields: []*discordgo.MessageEmbedField{{
+							Name:   "Temp Title",
+							Value:  sitePo.essentialInfoForEmbed(),
+							Inline: false,
+						}},
+					})
 					return
 				}
 			case <-time.After(time.Duration(stageOvertime) * time.Second):
@@ -278,7 +292,19 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 			}
 			//save it to the database
 			go persistSitePo(sitePO, true)
-			discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
+			// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
+			//TODO: snapshot things.
+			discord.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+				Title:       "Site saved",
+				Description: "The following site has been saved",
+				Timestamp:   time.Now().Format(time.RFC3339),
+				Color:       discord.EmbedColorNormal,
+				Fields: []*discordgo.MessageEmbedField{{
+					Name:   "Temp Title",
+					Value:  sitePO.essentialInfoForEmbed(),
+					Inline: false,
+				}},
+			})
 			//no subsequent check
 			return nil
 		case "list-site":
@@ -332,8 +358,6 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 }
 
 type SitePO struct {
-	//Reserved
-	ID_ primitive.ObjectID `bson:"_id"`
 	//Display Info
 	ID   int      `bson:"id"`
 	Site string   `bson:"site"`
@@ -454,7 +478,7 @@ func newListSiteEmbed(arr sitePoArr) *discordgo.MessageEmbed {
 		Title:       "ls result",
 		Description: fmt.Sprintf("Your query rendered %d results.", len(arr)),
 		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       0x33acff,
+		Color:       discord.EmbedColorNormal,
 		Fields:      nil,
 	}
 	var fields []*discordgo.MessageEmbedField

@@ -7,6 +7,11 @@ import (
 	"log"
 )
 
+const (
+	EmbedColorNormal   = 0x33acff
+	EmbedColorQuestion = 0xffcb66
+)
+
 // ChannelMessageSend a wrapper of discordgo ChannelMessageSend function
 func ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
 	return clients.DgSession.ChannelMessageSend(channelID, content)
