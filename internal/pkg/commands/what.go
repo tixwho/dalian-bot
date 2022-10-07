@@ -12,9 +12,9 @@ type WhatCommand struct {
 	RegexTextCommand
 }
 
-func (cm *WhatCommand) MatchMessage(message *discordgo.Message) bool {
+func (cm *WhatCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
 	matchStatus, _ := cm.RegMatchMessage(message.Content)
-	return matchStatus
+	return matchStatus, true
 }
 
 func (cm *WhatCommand) New() {
@@ -23,16 +23,7 @@ func (cm *WhatCommand) New() {
 	cm.RegexExpressions = append(cm.RegexExpressions, regexp.MustCompile("^what$"))
 }
 
-func (cm *WhatCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return cm.MatchMessage(m.Message)
-}
-
-func (cm *WhatCommand) Do(a ...any) error {
-	m := a[0].(*discordgo.MessageCreate)
+func (cm *WhatCommand) DoMessage(m *discordgo.MessageCreate) error {
 	step := 2
 	for {
 		msgs, err := clients.DgSession.ChannelMessages(m.ChannelID, step, m.ID, "", "")

@@ -11,31 +11,22 @@ type ListCommand struct {
 	PlainCommand
 }
 
-func (m *ListCommand) MatchMessage(message *discordgo.Message) bool {
-	matchStatus, _ := m.MatchText(message.Content)
-	return matchStatus
+func (cm *ListCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
+	matchStatus, _ := cm.MatchText(message.Content)
+	return matchStatus, true
 }
 
-func (m *ListCommand) New() {
-	m.Name = "list"
-	m.Identifiers = []string{"list", "l"}
+func (cm *ListCommand) New() {
+	cm.Name = "list"
+	cm.Identifiers = []string{"list", "l"}
 }
 
-func (m *ListCommand) Match(a ...any) bool {
-	msg, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return m.MatchMessage(msg.Message)
-}
-
-func (m *ListCommand) Do(a ...any) error {
-	msg := a[0].(*discordgo.MessageCreate)
+func (cm *ListCommand) DoMessage(m *discordgo.MessageCreate) error {
 	names := make([]string, 0, len(CommandByName))
 	for k := range CommandByName {
 		names = append(names, k)
 	}
-	clients.DgSession.ChannelMessageSend(msg.ChannelID, fmt.Sprintf("**Listing Registered Commands**\r\n%v", names))
+	clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("**Listing Registered Commands**\r\n%v", names))
 	return nil
 }
 

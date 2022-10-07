@@ -14,9 +14,9 @@ type FixedImageCommand struct {
 	imageMap map[string]string
 }
 
-func (cm *FixedImageCommand) MatchMessage(message *discordgo.Message) bool {
+func (cm *FixedImageCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
 	matchStatus, _ := cm.MatchText(message.Content)
-	return matchStatus
+	return matchStatus, true
 }
 
 func (cm *FixedImageCommand) New() {
@@ -27,16 +27,7 @@ func (cm *FixedImageCommand) New() {
 	cm.imageMap["tairitsu-dragon"] = "static/tairitsu-dragon.png"
 }
 
-func (cm *FixedImageCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return cm.MatchMessage(m.Message)
-}
-
-func (cm *FixedImageCommand) Do(a ...any) error {
-	m := a[0].(*discordgo.MessageCreate)
+func (cm *FixedImageCommand) DoMessage(m *discordgo.MessageCreate) error {
 	args, argCount := cm.SeparateArgs(m.Message.Content, Separator)
 	if argCount <= 1 {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "not enough arguments!")

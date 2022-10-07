@@ -38,29 +38,29 @@ type SaveThisSiteCommand struct {
 	ActiveSitetageMap activeSitestageMap
 }
 
-func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.Message) bool {
+func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, bool) {
 	//manual
 	if matchStatus, _ := cm.MatchText(m.Content); matchStatus {
-		return true
+		return true, true
 	}
 	//stage progress
 	if isCallingBot, _ := cm.IsCallingBot(m.Content); isCallingBot {
 		//a stage present, check if it's a stage info
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m)]; ok {
-			return true
+		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
+			return true, true
 		}
 
 	}
 	//implicit
 	if _, err := url.ParseRequestURI(m.Content); err == nil {
 		//go through active stages to make sure no other in process
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m)]; ok {
+		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
 			discord.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
-			return false
+			return false, true
 		}
-		return true
+		return true, true
 	}
-	return false
+	return false, true
 }
 
 type combinedKey string
@@ -125,7 +125,7 @@ func (s *saveSiteStage) process() {
 	//prep
 	questionPrompt := "Detected the following url:\r" +
 		" %s\r" +
-		"Do you wish to add it to SiteCollection? (y/yes/n/no)\r" +
+		"DoMessage you wish to add it to SiteCollection? (y/yes/n/no)\r" +
 		"all answers should start with **@%s**, expires in %d seconds"
 	promptEmbed := &discordgo.MessageEmbed{
 		Description: fmt.Sprintf(questionPrompt, s.URL, clients.DgSession.State.User.Username, stageOvertime),
@@ -212,6 +212,7 @@ func (cm *SaveThisSiteCommand) New() {
 	cm.RegexExpressions = []*regexp.Regexp{}
 	cm.RegexExpressions = append(cm.RegexExpressions, regexp.MustCompile(websiteRegex))
 	cm.InitAvailableFlagMap()
+	//the flag for taggiong sites
 	cm.RegisterCommandFlag(CommandFlag{
 		Name:             "tag",
 		FlagPrefix:       []string{"tag", "t"},
@@ -219,6 +220,7 @@ func (cm *SaveThisSiteCommand) New() {
 		MultipleExtraArg: true,
 		MEGroup:          nil,
 	})
+	//the flag for debugging flag inputs
 	cm.RegisterCommandFlag(CommandFlag{
 		Name:             "debug",
 		FlagPrefix:       []string{"debug"},
@@ -226,6 +228,7 @@ func (cm *SaveThisSiteCommand) New() {
 		MultipleExtraArg: false,
 		MEGroup:          nil,
 	})
+	//the flag for adding notes to sites
 	cm.RegisterCommandFlag(CommandFlag{
 		Name:             "note",
 		FlagPrefix:       []string{"note", "n"},
@@ -233,20 +236,18 @@ func (cm *SaveThisSiteCommand) New() {
 		MultipleExtraArg: false,
 		MEGroup:          nil,
 	})
+	//the flag for using next-generation interactions.
+	cm.RegisterCommandFlag(CommandFlag{
+		Name:             "neo",
+		FlagPrefix:       []string{"neo"},
+		AcceptsExtraArg:  false,
+		MultipleExtraArg: false,
+		MEGroup:          nil,
+	})
 
 }
 
-func (cm *SaveThisSiteCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return cm.MatchMessage(m.Message)
-}
-
-func (cm *SaveThisSiteCommand) Do(a ...any) error {
-	m := a[0].(*discordgo.MessageCreate)
-
+func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 	//first check manual
 	//one-step insertion, or list / other operations
 	if matchStatus, matchedCommand := cm.MatchText(m.Content); matchStatus {
@@ -263,7 +264,7 @@ func (cm *SaveThisSiteCommand) Do(a ...any) error {
 			discord.ChannelReportError(m.ChannelID, err)
 			return nil
 		}
-		if _, debugStatus := flagMap["debug"]; debugStatus {
+		if flagMap.HasFlag("debug") {
 			discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("flagMap:%v", flagMap))
 		}
 		//execute command body

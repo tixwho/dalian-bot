@@ -40,13 +40,7 @@ func SetBotID(botID string) {
 type ICommand interface {
 	// New All command must have a valid pointer initialization method
 	New()
-	// Match All command should run when specific event is macthed
-	// a anything you may need to match. It is your OWN responsibility to validate before use.
-	Match(a ...any) bool
-	// Do All command wlll do something
-	// a anything you may need to execute. It is your OWN responsibility to validate before use.
-	// err if anything worth *reporting* happened. expected error should not be returned.
-	Do(a ...any) (err error)
+
 	// GetName All command must have a name (unique identifier)
 	GetName() string
 }
@@ -62,19 +56,19 @@ func (cm *Command) GetName() string {
 }
 
 type ITextCommand interface {
-	MatchMessage(message *discordgo.Message) bool
+	MatchMessage(message *discordgo.MessageCreate) (isMatched bool, isTerminated bool)
+	// DoMessage All command wlll do something
+	// a anything you may need to execute. It is your OWN responsibility to validate before use.
+	// err if anything worth *reporting* happened. expected error should not be returned.
+	DoMessage(message *discordgo.MessageCreate) (err error)
 }
 
-// IPlainTextCommand Text command triggers when a specific text is detected
-type IPlainTextCommand interface {
-	ICommand
-	// MatchText Match a content for a given logic.
-	// isMatched Whether the content matches the logic or nog
-	// matchWhat Which part is matched, useful when matching multiple features
-	MatchText(content string) (isMatched bool, matchedWhat string)
+type ISlashCommand interface {
+	MatchInteraction(interaction *discordgo.InteractionCreate) (isMatched bool)
+	DoInteraction(interaction *discordgo.InteractionCreate) (err error)
 }
 
-// PlainCommand the most common type of command
+// PlainCommand Text command triggers when a specific text is detected, the most common type of command
 // start with global identifier, have one or more arguments
 type PlainCommand struct {
 	Identifiers []string
@@ -91,15 +85,8 @@ func (cm *PlainCommand) MatchText(content string) (bool, string) {
 	return false, ""
 }
 
-// IRegexTextCommand Complicated TextCommand, using Regex to match
+// RegexTextCommand Complicated TextCommand, using Regex to match
 // Grants possibility of NOT using identifiers and perform advanced macthing actions.
-type IRegexTextCommand interface {
-	ICommand
-	// RegMatchMessage matching given content with one or more Regex expression given.
-	RegMatchMessage(content string) (isMatched bool, matchedRegex regexp.Regexp)
-}
-
-// RegexTextCommand Functional structure of regex command
 // embeds one or multiple regex expression(s) for matching purposes.
 type RegexTextCommand struct {
 	RegexExpressions []*regexp.Regexp
@@ -115,12 +102,7 @@ func (cm *RegexTextCommand) RegMatchMessage(content string) (bool, regexp.Regexp
 	return false, regexp.Regexp{}
 }
 
-// IArgCommand Text commands with multiple arguments
-type IArgCommand interface {
-	SeparateArgs(content, separator string) (args []string, argCount int)
-}
-
-// ArgCommand Functional strucutre of multi-args comand
+// ArgCommand Text commands with multiple arguments
 // embeds a default splitting method for multiple args
 type ArgCommand struct {
 }
@@ -141,12 +123,6 @@ func (cm *ArgCommand) SeparateArgs(content, separator string) ([]string, int) {
 	return args, len(args)
 }
 
-// IFlagCommand Text commands enabling linux flag-like inputs
-type IFlagCommand interface {
-	ParseFlags(content string) (FlagArgstatMaps, error)
-	ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMaps, error)
-}
-
 // CommandFlag basic structure for handling command flags
 type CommandFlag struct {
 	Name             string   // Flag name
@@ -156,7 +132,7 @@ type CommandFlag struct {
 	MEGroup          []string // Mutually exclusive group
 }
 
-// FlagCommand Functional structure for flag handling
+// FlagCommand Text commands enabling linux flag-like inputs
 type FlagCommand struct {
 	// FlagArgstatMaps: flag name : ?args required
 	AvailableFlagMap map[string]*CommandFlag
@@ -164,6 +140,13 @@ type FlagCommand struct {
 
 // FlagArgstatMaps Defined structure for storing flag info for a given trigger
 type FlagArgstatMaps map[string][]string
+
+// HasFlag A helper function for checking simple existence of a flag.
+// often equivalent to len(flagMap[flagName])>0
+func (flagMap FlagArgstatMaps) HasFlag(flagName string) bool {
+	_, exist := flagMap[flagName]
+	return exist
+}
 
 // ParseFlags read the input flag from given text message.
 // Does NOT handle the validation part,only return err if the input is invalid structuralwise
@@ -176,7 +159,7 @@ func (cm *FlagCommand) ParseFlags(content string) (FlagArgstatMaps, error) {
 	if err != nil {
 		return nil, err
 	}
-	//if no flags ever present
+	//if no flags ever presentI
 	if len(temp) == 1 {
 		return flagMap, nil
 	}

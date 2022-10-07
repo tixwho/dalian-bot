@@ -19,9 +19,9 @@ type CrudCommand struct {
 	FlagCommand
 }
 
-func (c *CrudCommand) MatchMessage(message *discordgo.Message) bool {
+func (c *CrudCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
 	matchStatus, _ := c.MatchText(message.Content)
-	return matchStatus
+	return matchStatus, true
 }
 
 const (
@@ -94,16 +94,7 @@ func newTestStruct(createEvent *discordgo.MessageCreate) CrudTestStruct {
 	}
 }
 
-func (c *CrudCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return c.MatchMessage(m.Message)
-}
-
-func (c *CrudCommand) Do(a ...any) error {
-	m := a[0].(*discordgo.MessageCreate)
+func (c *CrudCommand) DoMessage(m *discordgo.MessageCreate) error {
 	args, argCount := c.SeparateArgs(m.Content, Separator)
 	/* Handle Flags */
 	flagMap, err := c.ParseFlags(args[0])

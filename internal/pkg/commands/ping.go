@@ -11,9 +11,9 @@ type PingCommand struct {
 	PlainCommand
 }
 
-func (cm *PingCommand) MatchMessage(message *discordgo.Message) bool {
+func (cm *PingCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
 	matchStatus, _ := cm.MatchText(message.Content)
-	return matchStatus
+	return matchStatus, true
 }
 
 func (cm *PingCommand) New() {
@@ -21,17 +21,7 @@ func (cm *PingCommand) New() {
 	cm.Identifiers = []string{"ping"}
 }
 
-func (cm *PingCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return cm.MatchMessage(m.Message)
-}
-
-func (cm *PingCommand) Do(a ...any) error {
-	//safely assume that it's a message create event
-	m := a[0].(*discordgo.MessageCreate)
+func (cm *PingCommand) DoMessage(m *discordgo.MessageCreate) error {
 	_, err := clients.DgSession.ChannelMessageSend(m.ChannelID, "Pong!")
 	if err != nil {
 		fmt.Println("error found:", err)

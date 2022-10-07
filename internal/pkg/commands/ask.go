@@ -19,13 +19,13 @@ type AskCommand struct {
 	ActiveAsks map[string]*AskStage
 }
 
-func (cm *AskCommand) MatchMessage(message *discordgo.Message) bool {
+func (cm *AskCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
 	if _, ok := cm.ActiveAsks[message.Author.ID]; ok {
 		matchStatus, _ := cm.IsCallingBot(message.Content)
-		return matchStatus
+		return matchStatus, true
 	}
 	matchStatus, _ := cm.MatchText(message.Content)
-	return matchStatus
+	return matchStatus, true
 }
 
 type AskStage struct {
@@ -75,16 +75,7 @@ func (cm *AskCommand) New() {
 	cm.ActiveAsks = make(map[string]*AskStage)
 }
 
-func (cm *AskCommand) Match(a ...any) bool {
-	m, isMsgCreate := a[0].(*discordgo.MessageCreate)
-	if !isMsgCreate {
-		return false
-	}
-	return cm.MatchMessage(m.Message)
-}
-
-func (cm *AskCommand) Do(a ...any) error {
-	m := a[0].(*discordgo.MessageCreate)
+func (cm *AskCommand) DoMessage(m *discordgo.MessageCreate) error {
 	if aa, ok := cm.ActiveAsks[m.Author.ID]; !ok {
 		cm.insertAsk(m)
 		return nil
