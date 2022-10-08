@@ -56,16 +56,33 @@ func (cm *Command) GetName() string {
 }
 
 type ITextCommand interface {
-	MatchMessage(message *discordgo.MessageCreate) (isMatched bool, isTerminated bool)
+	MatchMessage(m *discordgo.MessageCreate) (isMatched bool, isTerminated bool)
 	// DoMessage All command wlll do something
 	// a anything you may need to execute. It is your OWN responsibility to validate before use.
 	// err if anything worth *reporting* happened. expected error should not be returned.
-	DoMessage(message *discordgo.MessageCreate) (err error)
+	DoMessage(m *discordgo.MessageCreate) (err error)
 }
 
 type ISlashCommand interface {
-	MatchInteraction(interaction *discordgo.InteractionCreate) (isMatched bool)
-	DoInteraction(interaction *discordgo.InteractionCreate) (err error)
+	MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool)
+	DoInteraction(i *discordgo.InteractionCreate) (err error)
+	GetAppCommand() *discordgo.ApplicationCommand
+}
+
+type SlashCommand struct {
+	AppCommand *discordgo.ApplicationCommand
+}
+
+func (cm *SlashCommand) GetAppCommand() *discordgo.ApplicationCommand {
+	return cm.AppCommand
+}
+
+func (cm *SlashCommand) ParseOptionsMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
+	for _, opt := range options {
+		optionMap[opt.Name] = opt
+	}
+	return optionMap
 }
 
 // PlainCommand Text command triggers when a specific text is detected, the most common type of command
@@ -292,4 +309,18 @@ type BasicStageInfo struct {
 
 type IStage interface {
 	process()
+}
+
+type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
+
+type IComponentCommand interface {
+	GetCompActionMap() ComponentActionMap
+}
+
+type ComponentCommand struct {
+	CompActionMap ComponentActionMap
+}
+
+func (cm *ComponentCommand) GetCompActionMap() ComponentActionMap {
+	return cm.CompActionMap
 }

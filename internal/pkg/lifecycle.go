@@ -9,7 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"os"
 )
 
 func InitDalian() error {
@@ -45,6 +45,8 @@ func InitDalian() error {
 		panic(err)
 	}
 
+	/* Setup Post-init */
+
 	/* Setup Cron from database --reserved-- */
 
 	/* Dalian specific setups */
@@ -53,6 +55,7 @@ func InitDalian() error {
 	commands.SetBotID(discordSession.State.User.ID)
 
 	commands.RegisterDiscordHandlers()
+	commands.RegisterSlashCommands()
 
 	fmt.Println("Bot is now running. Press Ctrl+C to exit.")
 	return nil
@@ -66,6 +69,7 @@ func GracefulShutDalian() error {
 		}
 		fmt.Println("Mongo connection closed.")
 	}()
+	commands.DisposeSlashCommands()
 	clients.DgSession.Close()
 	fmt.Println("Connection closed!")
 	return nil
@@ -85,7 +89,7 @@ type Mongo struct {
 }
 
 func GetCred(cred *Cred, fileLocation string) error {
-	yamlFile, err := ioutil.ReadFile(fileLocation)
+	yamlFile, err := os.ReadFile(fileLocation)
 	if err != nil {
 		fmt.Println(err.Error())
 	}
