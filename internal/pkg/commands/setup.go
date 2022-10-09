@@ -44,7 +44,7 @@ func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	//debugging
-	fmt.Printf("Int: %s:%s \r\n", i.Member.User.Username, i.Data)
+	fmt.Printf("Int: %s:%s:%v \r\n", i.Member.User.Username, i.Data, i.Message)
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		for _, v := range CommandByName {
@@ -57,7 +57,9 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			}
 		}
 	case discordgo.InteractionMessageComponent:
-
+		if compCmd, ok := CommandByComponentID[i.MessageComponentData().CustomID]; ok {
+			(*compCmd).(IComponentCommand).DoComponent(i)
+		}
 	}
 
 }

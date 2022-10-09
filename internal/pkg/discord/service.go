@@ -10,6 +10,8 @@ import (
 const (
 	EmbedColorNormal   = 0x33acff
 	EmbedColorQuestion = 0xffcb66
+	EmbedColorSuccess  = 0x3df53d
+	EmbedColorDanger   = 0xfa3838
 )
 
 // ChannelMessageSend a wrapper of discordgo ChannelMessageSend function

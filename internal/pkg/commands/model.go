@@ -315,6 +315,7 @@ type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
 
 type IComponentCommand interface {
 	GetCompActionMap() ComponentActionMap
+	DoComponent(i *discordgo.InteractionCreate) error
 }
 
 type ComponentCommand struct {
