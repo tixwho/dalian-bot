@@ -60,6 +60,8 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if compCmd, ok := CommandByComponentID[i.MessageComponentData().CustomID]; ok {
 			(*compCmd).(IComponentCommand).DoComponent(i)
 		}
+	default:
+		fmt.Printf("Unknwon type: %s :: %v", i.Type, i)
 	}
 
 }

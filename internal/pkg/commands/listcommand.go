@@ -83,7 +83,7 @@ func (cm *ListCommand) New() {
 		clients.DgSession.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: "Thank you for your approve!",
+				Content: "Thank you for your approval!",
 			},
 		})
 	}
@@ -110,6 +110,22 @@ func (cm *ListCommand) New() {
 		})
 
 	}
+	cm.CompActionMap["list-command-select"] = func(i *discordgo.InteractionCreate) {
+		clients.DgSession.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("You selected: %v", i.MessageComponentData().Values),
+			},
+		})
+	}
+	cm.CompActionMap["list-command-text"] = func(i *discordgo.InteractionCreate) {
+		clients.DgSession.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("You typed %s, 什么鬼玩意儿", i.MessageComponentData().Values),
+			},
+		})
+	}
 }
 
 func (cm *ListCommand) DoMessage(m *discordgo.MessageCreate) error {
@@ -125,21 +141,66 @@ func (cm *ListCommand) DoMessage(m *discordgo.MessageCreate) error {
 			Inline: false,
 		})
 	}
+	one := 1
 	_, err := clients.DgSession.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
 		Content: "Listing registered commands",
 		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-				discordgo.Button{
-					Label:    "Good",
-					Style:    discordgo.SuccessButton,
-					CustomID: "list-command-good",
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    "Good",
+						Style:    discordgo.SuccessButton,
+						CustomID: "list-command-good",
+					},
+					discordgo.Button{
+						Label:    "Bad",
+						Style:    discordgo.DangerButton,
+						CustomID: "list-command-bad",
+					},
+				}},
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.SelectMenu{
+						CustomID:    "list-command-select",
+						Placeholder: "select something random here",
+						MinValues:   &one,
+						MaxValues:   2,
+						Options: []discordgo.SelectMenuOption{
+							{
+								Label:       "啊米浴说的道理",
+								Value:       "riceshower",
+								Description: "魔神语",
+								Default:     true,
+							},
+							{
+								Label:       "陈睿柠檬",
+								Value:       "cr",
+								Description: "温文尔雅",
+								Default:     false,
+							},
+							{
+								Label:       "从胜利走向胜利！",
+								Value:       "victory",
+								Description: "庆祝大会胜利召开！",
+								Default:     false,
+							},
+						},
+					},
 				},
-				discordgo.Button{
-					Label:    "Bad",
-					Style:    discordgo.DangerButton,
-					CustomID: "list-command-bad",
+			},
+			/* Text input is reserved for Modal!
+			discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.TextInput{
+						CustomID:    "list-command-text",
+						Label:       "写点什么",
+						Style:       discordgo.TextInputShort,
+						Placeholder: "wuli 坤坤",
+						Required:    true,
+					},
 				},
-			}},
+			},
+			*/
 		},
 		Embeds: []*discordgo.MessageEmbed{
 			{
