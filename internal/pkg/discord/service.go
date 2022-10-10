@@ -27,6 +27,28 @@ func ChannelReportError(channelID string, error error) (*discordgo.Message, erro
 	return ChannelMessageSend(channelID, error.Error())
 }
 
+func InteractionRespondComplex(i *discordgo.Interaction, resp *discordgo.InteractionResponse) error {
+	return clients.DgSession.InteractionRespond(i, resp)
+}
+
+func InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageEmbed) error {
+	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Embeds: []*discordgo.MessageEmbed{embed},
+		},
+	})
+}
+
+func InteractionRespond(i *discordgo.Interaction, content string) error {
+	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: content,
+		},
+	})
+}
+
 // ChannelFileSend send a file to given guild channel.
 // channelID the id of a channel
 // name the display filename to be sent to discord

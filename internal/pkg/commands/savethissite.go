@@ -36,6 +36,51 @@ type SaveThisSiteCommand struct {
 	BotCallingCommand
 	//Map containing active implicit collecting process
 	ActiveSitetageMap activeSitestageMap
+	//Slash Command support
+	SlashCommand
+}
+
+func (cm *SaveThisSiteCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
+	if i.ApplicationCommandData().Name == cm.AppCommand.Name {
+		return true
+	}
+	return false
+}
+
+func (cm *SaveThisSiteCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
+	optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
+	if _, err := url.ParseRequestURI(optionsMap["url"].StringValue()); err != nil {
+		discord.InteractionRespond(i.Interaction, "You must provide a *valid* url!")
+		return nil
+	}
+	//validation passed, start the logic
+	sitePO := newRawSitePoFromInteraction(i.Interaction)
+	//set site
+	sitePO.Site = optionsMap["url"].StringValue()
+	//set tags
+	if tagsOption, ok := optionsMap["tags"]; ok {
+		ephemeralTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
+		sitePO.Tags = ephemeralTags
+	}
+	if tagsOption, ok := optionsMap["note"]; ok {
+		sitePO.Note = tagsOption.StringValue()
+	}
+	//save it to the database
+	go persistSitePo(sitePO, true)
+	// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
+	//TODO: snapshot things.
+	discord.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
+		Title:       "Site saved",
+		Description: "The following site has been saved",
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Color:       discord.EmbedColorNormal,
+		Fields: []*discordgo.MessageEmbedField{{
+			Name:   "Temp Title",
+			Value:  sitePO.essentialInfoForEmbed(),
+			Inline: false,
+		}},
+	})
+	return nil
 }
 
 func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, bool) {
@@ -150,7 +195,7 @@ func (s *saveSiteStage) process() {
 				switch s.StageNow {
 				case 0:
 					if content == "y" || content == "yes" {
-						sitePo = newRawSitePO(msg)
+						sitePo = newRawSitePOFromMessage(msg)
 						sitePo.Site = s.URL
 						prompt := "[1/2] Add tags for this site, separated by default separator, type \"-\" to leave it blank.\r" +
 							"Current separator:[%s]"
@@ -245,6 +290,34 @@ func (cm *SaveThisSiteCommand) New() {
 		MEGroup:          nil,
 	})
 
+	//Slash Commands
+	cm.AppCommand = &discordgo.ApplicationCommand{
+		Name:        "save-site",
+		Description: "Request Dalian to save the site.",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type:        discordgo.ApplicationCommandOptionString,
+				Name:        "url",
+				Description: "The valid Url to be stored into database.",
+				Required:    true,
+			},
+			{
+				Type: discordgo.ApplicationCommandOptionString,
+				Name: "tags",
+				Description: fmt.Sprintf("Add tags for this site, separated by default separator."+
+					" Current separator:[%s]", Separator),
+				Required: false,
+			},
+			{
+				Type: discordgo.ApplicationCommandOptionString,
+				Name: "note",
+				Description: fmt.Sprintf("Add note for this site."+
+					" Current separator:[%s]", Separator),
+				Required: false,
+			},
+		},
+	}
+
 }
 
 func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
@@ -280,7 +353,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 				return nil
 			}
 			//validation passed, start the logic
-			sitePO := newRawSitePO(m.Message)
+			sitePO := newRawSitePOFromMessage(m.Message)
 			//set site
 			sitePO.Site = args[1]
 			//set tags
@@ -422,7 +495,7 @@ func (sp *SitePO) essentialInfoForEmbed() string {
 	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
 }
 
-func newRawSitePO(message *discordgo.Message) SitePO {
+func newRawSitePOFromMessage(message *discordgo.Message) SitePO {
 	sitepo := SitePO{
 		Site:      "",
 		Tags:      []string{},
@@ -430,6 +503,18 @@ func newRawSitePO(message *discordgo.Message) SitePO {
 		GuildID:   message.GuildID,
 		ChannelID: message.ChannelID,
 		UserID:    message.Author.ID,
+	}
+	return sitepo
+}
+
+func newRawSitePoFromInteraction(i *discordgo.Interaction) SitePO {
+	sitepo := SitePO{
+		Site:      "",
+		Tags:      []string{},
+		Note:      "",
+		GuildID:   i.GuildID,
+		ChannelID: i.ChannelID,
+		UserID:    i.Member.User.ID,
 	}
 	return sitepo
 }
