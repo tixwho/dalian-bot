@@ -63,18 +63,29 @@ type ITextCommand interface {
 	DoMessage(m *discordgo.MessageCreate) (err error)
 }
 
+type AppCommandsMap map[string]*discordgo.ApplicationCommand
+
 type ISlashCommand interface {
 	MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool)
 	DoInteraction(i *discordgo.InteractionCreate) (err error)
-	GetAppCommand() *discordgo.ApplicationCommand
+	GetAppCommandsMap() AppCommandsMap
 }
 
 type SlashCommand struct {
-	AppCommand *discordgo.ApplicationCommand
+	AppCommandsMap AppCommandsMap
 }
 
-func (cm *SlashCommand) GetAppCommand() *discordgo.ApplicationCommand {
-	return cm.AppCommand
+func (cm *SlashCommand) GetAppCommandsMap() AppCommandsMap {
+	return cm.AppCommandsMap
+}
+
+func (cm *SlashCommand) DefaultMatchCommand(i *discordgo.InteractionCreate) (bool, string) {
+	for _, slashCmd := range cm.AppCommandsMap {
+		if i.ApplicationCommandData().Name == slashCmd.Name {
+			return true, slashCmd.Name
+		}
+	}
+	return false, ""
 }
 
 func (cm *SlashCommand) ParseOptionsMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {

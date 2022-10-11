@@ -74,11 +74,13 @@ func RegisterDiscordHandlers() {
 func RegisterSlashCommands() {
 	for _, v := range CommandByName {
 		if ISlashCmd, ok := (*v).(ISlashCommand); ok {
-			cmd, err := clients.DgSession.ApplicationCommandCreate(clients.DgSession.State.User.ID, "", ISlashCmd.GetAppCommand())
-			if err != nil {
-				log.Panicf("Cannot create '%v' command: %v", ISlashCmd.GetAppCommand(), err)
+			for _, appCmd := range ISlashCmd.GetAppCommandsMap() {
+				registeredCmd, err := clients.DgSession.ApplicationCommandCreate(clients.DgSession.State.User.ID, "", appCmd)
+				if err != nil {
+					log.Panicf("Cannot create '%v' command: %v", appCmd.Name, err)
+				}
+				registeredCommands = append(registeredCommands, registeredCmd)
 			}
-			registeredCommands = append(registeredCommands, cmd)
 		}
 	}
 }

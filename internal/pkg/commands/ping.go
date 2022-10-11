@@ -14,7 +14,7 @@ type PingCommand struct {
 }
 
 func (cm *PingCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
-	if i.ApplicationCommandData().Name == cm.AppCommand.Name {
+	if i.ApplicationCommandData().Name == cm.AppCommandsMap["ping"].Name {
 		return true
 	}
 	return false
@@ -39,7 +39,8 @@ func (cm *PingCommand) MatchMessage(message *discordgo.MessageCreate) (bool, boo
 func (cm *PingCommand) New() {
 	cm.Name = "ping"
 	cm.Identifiers = []string{"ping"}
-	cm.AppCommand = &discordgo.ApplicationCommand{
+	cm.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
+	cm.AppCommandsMap["ping"] = &discordgo.ApplicationCommand{
 		Name:        "ping",
 		Description: "Ping command for Dalian",
 	}

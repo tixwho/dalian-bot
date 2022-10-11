@@ -24,10 +24,8 @@ func (cm *ListCommand) DoComponent(i *discordgo.InteractionCreate) error {
 }
 
 func (cm *ListCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
-	if i.ApplicationCommandData().Name == cm.AppCommand.Name {
-		return true
-	}
-	return false
+	status, _ := cm.DefaultMatchCommand(i)
+	return status
 }
 
 func (cm *ListCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
@@ -62,7 +60,8 @@ func (cm *ListCommand) MatchMessage(message *discordgo.MessageCreate) (bool, boo
 func (cm *ListCommand) New() {
 	cm.Name = "list-command"
 	cm.Identifiers = []string{"list", "l"}
-	cm.AppCommand = &discordgo.ApplicationCommand{
+	cm.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
+	cm.AppCommandsMap["list-command"] = &discordgo.ApplicationCommand{
 		Name:        "list-command",
 		Description: "List the name of all available commands.",
 		Options: []*discordgo.ApplicationCommandOption{

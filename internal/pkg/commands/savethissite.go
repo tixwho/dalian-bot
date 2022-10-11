@@ -41,10 +41,8 @@ type SaveThisSiteCommand struct {
 }
 
 func (cm *SaveThisSiteCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
-	if i.ApplicationCommandData().Name == cm.AppCommand.Name {
-		return true
-	}
-	return false
+	status, _ := cm.DefaultMatchCommand(i)
+	return status
 }
 
 func (cm *SaveThisSiteCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
@@ -291,7 +289,8 @@ func (cm *SaveThisSiteCommand) New() {
 	})
 
 	//Slash Commands
-	cm.AppCommand = &discordgo.ApplicationCommand{
+	cm.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
+	cm.AppCommandsMap["save-site"] = &discordgo.ApplicationCommand{
 		Name:        "save-site",
 		Description: "Request Dalian to save the site.",
 		Options: []*discordgo.ApplicationCommandOption{
@@ -315,6 +314,12 @@ func (cm *SaveThisSiteCommand) New() {
 					" Current separator:[%s]", Separator),
 				Required: false,
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionBoolean,
+				Name:        "cache",
+				Description: "Cache the given site",
+				Required:    false,
+			},
 		},
 	}
 
@@ -328,13 +333,13 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 		//read the flags
 		flagMap, err := cm.ParseFlags(args[0])
 		if err != nil {
-			discord.ChannelReportError(m.ChannelID, err)
+			discord.ChannelMessageReportError(m.ChannelID, err)
 			return nil
 		}
 		//validate the flags
 		flagMap, err = cm.ValidateFlagMap(flagMap)
 		if err != nil {
-			discord.ChannelReportError(m.ChannelID, err)
+			discord.ChannelMessageReportError(m.ChannelID, err)
 			return nil
 		}
 		if flagMap.HasFlag("debug") {
@@ -412,7 +417,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 		//calling insertStage to start a goroutine for stepped Q&A
 		//the stage will auto dispose.
 		if err := cm.ActiveSitetageMap.insertStage(m, cm); err != nil {
-			discord.ChannelReportError(m.ChannelID, err)
+			discord.ChannelMessageReportError(m.ChannelID, err)
 		}
 		//no subsequent check
 		return nil
