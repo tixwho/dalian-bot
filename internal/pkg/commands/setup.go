@@ -71,6 +71,14 @@ func RegisterDiscordHandlers() {
 	clients.DgSession.AddHandler(interactionCreate)
 }
 
+func LateInitCommands() {
+	for _, v := range CommandByName {
+		if iLateInitCmd, ok := (*v).(ILateInitCommand); ok {
+			iLateInitCmd.LateInit()
+		}
+	}
+}
+
 func RegisterSlashCommands() {
 	for _, v := range CommandByName {
 		if ISlashCmd, ok := (*v).(ISlashCommand); ok {

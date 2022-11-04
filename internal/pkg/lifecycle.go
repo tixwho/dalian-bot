@@ -53,7 +53,7 @@ func InitDalian() error {
 	commands.SetPrefix("$")
 	commands.SetSeparator("$")
 	commands.SetBotID(discordSession.State.User.ID)
-
+	commands.LateInitCommands()
 	commands.RegisterDiscordHandlers()
 	commands.RegisterSlashCommands()
 
