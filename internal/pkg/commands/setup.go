@@ -50,8 +50,8 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		for _, v := range CommandByName {
 			//only test TextCommand for MscCreate events
 			if iSlashCmd, ok := (*v).(ISlashCommand); ok {
-				if iSlashCmd.MatchInteraction(i) {
-					iSlashCmd.DoInteraction(i)
+				if iSlashCmd.MatchNamedInteraction(i) {
+					iSlashCmd.DoNamedInteraction(i)
 					return
 				}
 			}
@@ -61,7 +61,7 @@ func interactionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			(*compCmd).(IComponentCommand).DoComponent(i)
 		}
 	default:
-		fmt.Printf("Unknwon type: %s :: %v", i.Type, i)
+		fmt.Printf("Unknwon type: %s :: %v\r\n", i.Type, i)
 	}
 
 }

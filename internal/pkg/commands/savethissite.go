@@ -35,49 +35,111 @@ type SaveThisSiteCommand struct {
 	//stepped support for implicit trigger
 	BotCallingCommand
 	//Map containing active implicit collecting process
-	ActiveSitetageMap activeSitestageMap
+	ActiveSaveSitetageMap saveSitestageMap
+	//Map containing active ls-site process
+	ActiveListSiteStageMap listSitestageMap
 	//Slash Command support
 	SlashCommand
+	//Component support for page rendering //todo: fill the action
+	ComponentCommand
 }
 
-func (cm *SaveThisSiteCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
+func (cm *SaveThisSiteCommand) DoComponent(i *discordgo.InteractionCreate) error {
+	//find the customID, do it.
+	compFunc := cm.CompActionMap[i.MessageComponentData().CustomID]
+	compFunc(i)
+	return nil
+}
+
+const (
+	lsButtonIDPrev = "ls-list_site-prev"
+	lsButtonIDNext = "ls-list_site-next"
+)
+
+func (cm *SaveThisSiteCommand) MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
 	status, _ := cm.DefaultMatchCommand(i)
 	return status
 }
 
-func (cm *SaveThisSiteCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
-	optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
-	if _, err := url.ParseRequestURI(optionsMap["url"].StringValue()); err != nil {
-		discord.InteractionRespond(i.Interaction, "You must provide a *valid* url!")
+func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate) (err error) {
+	switch _, interactionName := cm.DefaultMatchCommand(i); interactionName {
+	/* Save-site */
+	case "save-site":
+		optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
+		if _, err := url.ParseRequestURI(optionsMap["url"].StringValue()); err != nil {
+			discord.InteractionRespond(i.Interaction, "You must provide a *valid* url!")
+			return nil
+		}
+		//validation passed, start the logic
+		sitePO := newRawSitePoFromInteraction(i.Interaction)
+		//set site
+		sitePO.Site = optionsMap["url"].StringValue()
+		//set tags
+		if tagsOption, ok := optionsMap["tags"]; ok {
+			ephemeralTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
+			sitePO.Tags = ephemeralTags
+		}
+		if tagsOption, ok := optionsMap["note"]; ok {
+			sitePO.Note = tagsOption.StringValue()
+		}
+		//save it to the database
+		go persistSitePo(sitePO, true)
+		// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
+		//TODO: snapshot things.
+		discord.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
+			Title:       "Site saved",
+			Description: "The following site has been saved",
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Color:       discord.EmbedColorNormal,
+			Fields: []*discordgo.MessageEmbedField{{
+				Name:   "Temp Title",
+				Value:  sitePO.essentialInfoForEmbed(),
+				Inline: false,
+			}},
+		}, nil)
 		return nil
+	case "list-site":
+		optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
+		query := bson.M{"user_id": i.Member.User.ID, "guild_id": i.GuildID}
+		//if found optional tags, add it to the query
+		//set tags
+		if tagsOption, ok := optionsMap["tags"]; ok {
+			parsedTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
+			query["tags"] = bson.M{"$all": parsedTags}
+
+		}
+		findOpts := options.Find().SetSort(bson.D{{"id", -1}})
+		siteCollectionPager := Pager{
+			IPagerLoader: &sitePoPagerLoader{
+				context:        context.Background(),
+				query:          query,
+				queryOptions:   []*options.FindOptions{findOpts},
+				resultsStorage: []*SitePO{},
+			},
+			pageNow: 1,
+			Limit:   7,
+			PrevPageButton: discordgo.Button{
+				Label:    discord.EmojiLeftArrow,
+				Style:    discordgo.PrimaryButton,
+				CustomID: lsButtonIDPrev,
+			},
+			NextPageButton: discordgo.Button{
+				Label:    discord.EmojiRightArrow,
+				Style:    discordgo.PrimaryButton,
+				CustomID: lsButtonIDNext,
+			},
+			EmbedFrame: &discordgo.MessageEmbed{
+				Title:     "ls-site result",
+				Color:     discord.EmbedColorNormal,
+				Timestamp: time.Now().Format(time.RFC3339),
+			},
+		}
+		siteCollectionPager.Setup(i.Interaction)
+		if siteCollectionPager.pageMax > 1 {
+			cm.ActiveListSiteStageMap.insertListSiteStage(i.Member.User.ID, siteCollectionPager, cm)
+		}
 	}
-	//validation passed, start the logic
-	sitePO := newRawSitePoFromInteraction(i.Interaction)
-	//set site
-	sitePO.Site = optionsMap["url"].StringValue()
-	//set tags
-	if tagsOption, ok := optionsMap["tags"]; ok {
-		ephemeralTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
-		sitePO.Tags = ephemeralTags
-	}
-	if tagsOption, ok := optionsMap["note"]; ok {
-		sitePO.Note = tagsOption.StringValue()
-	}
-	//save it to the database
-	go persistSitePo(sitePO, true)
-	// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
-	//TODO: snapshot things.
-	discord.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
-		Title:       "Site saved",
-		Description: "The following site has been saved",
-		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       discord.EmbedColorNormal,
-		Fields: []*discordgo.MessageEmbedField{{
-			Name:   "Temp Title",
-			Value:  sitePO.essentialInfoForEmbed(),
-			Inline: false,
-		}},
-	})
+
 	return nil
 }
 
@@ -89,7 +151,7 @@ func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, b
 	//stage progress
 	if isCallingBot, _ := cm.IsCallingBot(m.Content); isCallingBot {
 		//a stage present, check if it's a stage info
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
+		if _, ok := cm.ActiveSaveSitetageMap[newSaveStageKeyFromMs(*m.Message)]; ok {
 			return true, true
 		}
 
@@ -97,7 +159,7 @@ func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, b
 	//implicit
 	if _, err := url.ParseRequestURI(m.Content); err == nil {
 		//go through active stages to make sure no other in process
-		if _, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
+		if _, ok := cm.ActiveSaveSitetageMap[newSaveStageKeyFromMs(*m.Message)]; ok {
 			discord.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
 			return false, true
 		}
@@ -106,17 +168,15 @@ func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, b
 	return false, true
 }
 
-type combinedKey string
+type saveSitestageMap map[CombinedKey]*saveSiteStage
 
-type activeSitestageMap map[combinedKey]*saveSiteStage
-
-func (m activeSitestageMap) insertStage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) error {
-	key := newStageKeyFromMs(*ms.Message)
+func (m saveSitestageMap) insertSaveSiteStage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) error {
+	key := newSaveStageKeyFromMs(*ms.Message)
 	if stage, ok := m[key]; ok {
 		return fmt.Errorf("found an active ask session at stage %d", stage.StageNow)
 	}
 
-	stage := newSitestage(ms, cm)
+	stage := newSaveSitestage(ms, cm)
 	stage.ProcessMsgChan = make(chan *discordgo.Message, 1)
 	stage.URL = ms.Content
 	m[key] = &stage
@@ -124,7 +184,7 @@ func (m activeSitestageMap) insertStage(ms *discordgo.MessageCreate, cm *SaveThi
 	return nil
 }
 
-func (m activeSitestageMap) disposeStage(key combinedKey) error {
+func (m saveSitestageMap) disposeSaveSiteStage(key CombinedKey) error {
 	if v, ok := m[key]; !ok {
 		return fmt.Errorf("disposing non-exist sitestage w/ id: %s", key)
 	} else {
@@ -135,15 +195,15 @@ func (m activeSitestageMap) disposeStage(key combinedKey) error {
 	return nil
 }
 
-func newStageKeyFromRaw(channelID, userID string) combinedKey {
-	return combinedKey(fmt.Sprintf("%s-%s", channelID, userID))
+func newSaveStageKeyFromRaw(channelID, userID string) CombinedKey {
+	return CombinedKeyFromRaw(channelID, userID)
 }
 
-func newStageKeyFromMs(ms discordgo.Message) combinedKey {
-	return newStageKeyFromRaw(ms.ChannelID, ms.Author.ID)
+func newSaveStageKeyFromMs(ms discordgo.Message) CombinedKey {
+	return newSaveStageKeyFromRaw(ms.ChannelID, ms.Author.ID)
 }
 
-func newSitestage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) saveSiteStage {
+func newSaveSitestage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) saveSiteStage {
 	stage := saveSiteStage{
 		BasicStageInfo: BasicStageInfo{
 			ChannelID:      ms.ChannelID,
@@ -245,13 +305,89 @@ func (s *saveSiteStage) process() {
 			}
 		}
 	}()
-	s.MainCommand.ActiveSitetageMap.disposeStage(newStageKeyFromRaw(s.ChannelID, s.UserID))
+	s.MainCommand.ActiveSaveSitetageMap.disposeSaveSiteStage(newSaveStageKeyFromRaw(s.ChannelID, s.UserID))
+}
+
+func newListSiteStage(ms *discordgo.Message, userID string, cm *SaveThisSiteCommand) listSiteStage {
+	stage := listSiteStage{
+		BasicStageInfo: BasicStageInfo{
+			ChannelID:      ms.ChannelID,
+			UserID:         userID,
+			StageNow:       0,
+			LastActionTime: time.Now(),
+		},
+		LsPager:                nil,
+		ProcessInteractionChan: nil,
+		MainCommand:            cm,
+	}
+	return stage
+}
+
+type listSiteStage struct {
+	BasicStageInfo
+	LsPager                *Pager
+	ProcessInteractionChan chan *discordgo.Interaction
+	MainCommand            *SaveThisSiteCommand
+}
+
+func (l *listSiteStage) process() {
+	func() {
+		for {
+			select {
+			case interaction, ok := <-l.ProcessInteractionChan:
+				if !ok {
+					fmt.Println("Aborted")
+					return
+				}
+				//this should never be called
+				fmt.Println(interaction.Data)
+				return
+			case <-time.After(time.Duration(5) * time.Minute):
+				//overtime termination sign
+				fmt.Println("terminating through overtime")
+				return
+			}
+		}
+	}()
+	l.MainCommand.ActiveListSiteStageMap.disposeListSiteStage(newListStageKeyFromRaw(l.LsPager.AttachedMessage.ID, l.UserID))
+}
+
+func newListStageKeyFromRaw(messageID, userID string) CombinedKey {
+	return CombinedKeyFromRaw(messageID, userID)
+}
+
+type listSitestageMap map[CombinedKey]*listSiteStage
+
+func (m listSitestageMap) insertListSiteStage(userID string, pager Pager, cm *SaveThisSiteCommand) error {
+	key := newListStageKeyFromRaw(pager.AttachedMessage.ID, userID)
+	//can have multiple active stage
+	if stage, ok := m[key]; ok {
+		return fmt.Errorf("found an identical session at stage %d", stage.StageNow)
+	}
+	//todo function of new ListSiteStage
+	stage := newListSiteStage(pager.AttachedMessage, userID, cm)
+	stage.ProcessInteractionChan = make(chan *discordgo.Interaction, 1)
+	stage.LsPager = &pager
+	m[key] = &stage
+	go stage.process()
+	return nil
+}
+
+func (m listSitestageMap) disposeListSiteStage(key CombinedKey) error {
+	if v, ok := m[key]; !ok {
+		return fmt.Errorf("disposing non-exist ls-site-stage w/ id: %s", key)
+	} else {
+		close(v.ProcessInteractionChan) // this should immediately trigger dispose
+	}
+	delete(m, key)
+	return nil
 }
 
 func (cm *SaveThisSiteCommand) New() {
 	cm.Name = "save-this-site"
 	cm.Identifiers = []string{"save-site", "list-site"}
-	cm.ActiveSitetageMap = make(map[combinedKey]*saveSiteStage)
+	cm.ActiveSaveSitetageMap = make(saveSitestageMap)
+	cm.ActiveListSiteStageMap = make(listSitestageMap)
 	cm.RegexExpressions = []*regexp.Regexp{}
 	cm.RegexExpressions = append(cm.RegexExpressions, regexp.MustCompile(websiteRegex))
 	cm.InitAvailableFlagMap()
@@ -303,15 +439,17 @@ func (cm *SaveThisSiteCommand) New() {
 			{
 				Type: discordgo.ApplicationCommandOptionString,
 				Name: "tags",
-				Description: fmt.Sprintf("Add tags for this site, separated by default separator."+
-					" Current separator:[%s]", Separator),
+				//late init, replace %s with separator
+				Description: "Add tags for this site, separated by default separator." +
+					" Current separator:[%s]",
 				Required: false,
 			},
 			{
 				Type: discordgo.ApplicationCommandOptionString,
 				Name: "note",
-				Description: fmt.Sprintf("Add note for this site."+
-					" Current separator:[%s]", Separator),
+				//same as above
+				Description: "Add note for this site." +
+					" Current separator:[%s]",
 				Required: false,
 			},
 			{
@@ -321,6 +459,34 @@ func (cm *SaveThisSiteCommand) New() {
 				Required:    false,
 			},
 		},
+	}
+	cm.AppCommandsMap["list-site"] = &discordgo.ApplicationCommand{
+		Name:        "list-site",
+		Description: "Retrieve sites saved by Dalian",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type: discordgo.ApplicationCommandOptionString,
+				Name: "tags",
+				//late init, replace %s with separator
+				Description: "Add tags for this site, separated by default separator." +
+					" Current separator:[%s]",
+				Required: false,
+			},
+		},
+	}
+
+	cm.CompActionMap = make(ComponentActionMap)
+	cm.CompActionMap[lsButtonIDPrev] = func(i *discordgo.InteractionCreate) {
+		matchKey := newListStageKeyFromRaw(i.Message.ID, i.Member.User.ID)
+		if listStage, ok := cm.ActiveListSiteStageMap[matchKey]; ok {
+			listStage.LsPager.SwitchPage(PagerPrevPage, i.Interaction)
+		}
+	}
+	cm.CompActionMap[lsButtonIDNext] = func(i *discordgo.InteractionCreate) {
+		matchKey := newListStageKeyFromRaw(i.Message.ID, i.Member.User.ID)
+		if listStage, ok := cm.ActiveListSiteStageMap[matchKey]; ok {
+			listStage.LsPager.SwitchPage(PagerNextPage, i.Interaction)
+		}
 	}
 
 }
@@ -414,9 +580,9 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 
 	//then check implicit
 	if _, err1 := url.ParseRequestURI(m.Content); err1 == nil {
-		//calling insertStage to start a goroutine for stepped Q&A
+		//calling insertSaveSiteStage to start a goroutine for stepped Q&A
 		//the stage will auto dispose.
-		if err := cm.ActiveSitetageMap.insertStage(m, cm); err != nil {
+		if err := cm.ActiveSaveSitetageMap.insertSaveSiteStage(m, cm); err != nil {
 			discord.ChannelMessageReportError(m.ChannelID, err)
 		}
 		//no subsequent check
@@ -424,7 +590,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 	}
 
 	//finally check stage progress
-	if activeStage, ok := cm.ActiveSitetageMap[newStageKeyFromMs(*m.Message)]; ok {
+	if activeStage, ok := cm.ActiveSaveSitetageMap[newSaveStageKeyFromMs(*m.Message)]; ok {
 		//a stage present, check if it's a stage info
 		if isCallingBot, _ := cm.IsCallingBot(m.Content); isCallingBot {
 			//@Bot content, pass to process for further check
@@ -452,6 +618,14 @@ type SitePO struct {
 	//Auditing info
 	CreatedTime      time.Time `bson:"created_time"`
 	LastModifiedTime time.Time `bson:"last_modified_time"`
+}
+
+func (sp *SitePO) ToMessageEmbedField() *discordgo.MessageEmbedField {
+	return &discordgo.MessageEmbedField{
+		Name:   fmt.Sprintf("Temporary Title"),
+		Value:  sp.essentialInfoForEmbed(),
+		Inline: false,
+	}
 }
 
 func (sp *SitePO) setTime(isCreate bool) {
@@ -574,18 +748,47 @@ func newListSiteEmbed(arr sitePoArr) *discordgo.MessageEmbed {
 	}
 	var fields []*discordgo.MessageEmbedField
 	for _, sitePo := range arr {
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   fmt.Sprintf("Temporary Title"),
-			Value:  sitePo.essentialInfoForEmbed(),
-			Inline: false,
-		})
+		fields = append(fields, sitePo.ToMessageEmbedField())
 	}
 	embed.Fields = fields
 	return embed
+}
+
+type sitePoPagerLoader struct {
+	context        context.Context
+	query          any
+	queryOptions   []*options.FindOptions
+	resultsStorage []*SitePO
+	DefaultPageRenderer
+}
+
+func (s *sitePoPagerLoader) LoadPager(pager *Pager) error {
+	findCursor, err := data.GetCollection("site_collection").Find(s.context, s.query, s.queryOptions...)
+	if err != nil {
+		return errors.Wrap(err, "error querying site_collections")
+	}
+	if err = findCursor.All(context.TODO(), &s.resultsStorage); err != nil {
+		return errors.Wrap(err, "internal Error: wrong cursor type")
+	}
+	for _, v := range s.resultsStorage {
+		var tempVar IPagerPart
+		tempVar = v
+		pager.completeItemSlice = append(pager.completeItemSlice, &tempVar)
+	}
+	return nil
 }
 
 func init() {
 	var saveThisCommand SaveThisSiteCommand
 	saveThisCommand.New()
 	RegisterCommand(&saveThisCommand)
+}
+
+func (cm *SaveThisSiteCommand) LateInit() {
+	//late-init separator in prompt
+	for _, cmdOption := range cm.AppCommandsMap["save-site"].Options {
+		if cmdOption.Name == "tags" || cmdOption.Name == "note" {
+			cmdOption.Description = fmt.Sprintf(cmdOption.Description, Separator)
+		}
+	}
 }

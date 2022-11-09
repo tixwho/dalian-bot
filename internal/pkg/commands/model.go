@@ -4,6 +4,8 @@ Package commands includes all interfaces, strucs and implementations of various 
 package commands
 
 import (
+	"dalian-bot/internal/pkg/discord"
+	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/kballard/go-shellquote"
@@ -36,6 +38,11 @@ func SetBotID(botID string) {
 	BotID = botID
 }
 
+// ILateInitCommand For commands that need a late init process in lifecycle (i.g.) database
+type ILateInitCommand interface {
+	LateInit()
+}
+
 // ICommand The highest level interface for all commands
 type ICommand interface {
 	// New All command must have a valid pointer initialization method
@@ -66,8 +73,8 @@ type ITextCommand interface {
 type AppCommandsMap map[string]*discordgo.ApplicationCommand
 
 type ISlashCommand interface {
-	MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool)
-	DoInteraction(i *discordgo.InteractionCreate) (err error)
+	MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool)
+	DoNamedInteraction(i *discordgo.InteractionCreate) (err error)
 	GetAppCommandsMap() AppCommandsMap
 }
 
@@ -221,22 +228,22 @@ func (cm *FlagCommand) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMap
 	for priKey, priExtra := range flagMaps {
 		//first check if the flag exist
 		if entry, ok := cm.AvailableFlagMap[priKey]; !ok {
-			return nil, fmt.Errorf("Unknown flag:[%s]", priKey)
+			return nil, fmt.Errorf("unknown flag:[%s]", priKey)
 		} else {
 			//checking extra arg status
 			if !entry.AcceptsExtraArg && len(priExtra) > 0 {
-				return nil, fmt.Errorf("Flag [%s] does NOT allow ANY extra argument", entry.Name)
+				return nil, fmt.Errorf("flag [%s] does NOT allow ANY extra argument", entry.Name)
 			}
 			//checking number of extra arg allowed
 			//i
 			if !entry.MultipleExtraArg && len(priExtra) > 1 {
-				return nil, fmt.Errorf("Flag [%s] allow exactly ONE extra argument", entry.Name)
+				return nil, fmt.Errorf("flag [%s] allow exactly ONE extra argument", entry.Name)
 			}
 			//checking ME status
 			for _, v := range entry.MEGroup {
 				//CommandFlag of the same ME group must NOT present in the temporary validation map.
 				if occupiedFlag, ok := tempMEMap[v]; ok {
-					return nil, fmt.Errorf("Flag [%s] is mutually exclusive w/ flag [%s]||ME Group Lock [%s]", entry.Name, occupiedFlag.Name, v)
+					return nil, fmt.Errorf("flag [%s] is mutually exclusive w/ flag [%s]||ME Group Lock [%s]", entry.Name, occupiedFlag.Name, v)
 				}
 				//validation passed. adding it to temporary ME map for future validation
 				tempMEMap[v] = *entry
@@ -250,7 +257,7 @@ func (cm *FlagCommand) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatMap
 				//alias used, need to examine number of extra argument
 				tempExtraArr := append(currentFlagExtraArg, priExtra...)
 				if !entry.MultipleExtraArg && len(tempExtraArr) > 1 {
-					return nil, fmt.Errorf("Flag [%s] does NOT allow ANY extra argument", entry.Name)
+					return nil, fmt.Errorf("flag [%s] does NOT allow ANY extra argument", entry.Name)
 				}
 				validatedArgStatMaps[entry.Name] = tempExtraArr
 			}
@@ -335,4 +342,166 @@ type ComponentCommand struct {
 
 func (cm *ComponentCommand) GetCompActionMap() ComponentActionMap {
 	return cm.CompActionMap
+}
+
+type PagerAction int
+
+const (
+	PagerPrevPage PagerAction = iota
+	PagerNextPage
+)
+
+type IPagerLoader interface {
+	//LoadPager initialize the pager
+	LoadPager(pager *Pager) error
+	//RenderPage render the given page
+	//index order of the first item
+	//limit max number of items in a page
+	//embedFrame given embed frame of render
+	//renderedEmbed *discordgo.MessageEmbed rendered, unsent.
+	RenderPage(pager *Pager, toPage, limit int, embedFrame discordgo.MessageEmbed) (renderedEmbed *discordgo.MessageEmbed, err error)
+}
+
+type Pager struct {
+	//core page loading functions, to be implemented
+	IPagerLoader
+	//autofilled later
+	AttachedMessage *discordgo.Message
+	//pagination cache. need fo fill Limit
+	pageNow, pageMax, Limit int
+	//embed rendering skeleton
+	EmbedFrame *discordgo.MessageEmbed
+	//Customized pagination button
+	PrevPageButton, NextPageButton discordgo.Button
+	//only used when not lazy loading
+	completeItemSlice []*IPagerPart
+	displayItemSlice  []*IPagerPart
+	//calculated actionsRow
+	actionsRow discordgo.ActionsRow
+}
+
+// Setup initialize a pager AND send an initial message with interaction components
+func (bp *Pager) Setup(trigger any) error {
+	//initialize pager
+	if err := bp.IPagerLoader.LoadPager(bp); err != nil {
+		return err
+	}
+
+	//initialize first page
+	filledFrame, err := bp.IPagerLoader.RenderPage(bp, bp.pageNow, bp.Limit, *bp.EmbedFrame)
+	if err != nil {
+		return err
+	}
+
+	//initialize buttons
+	var components []discordgo.MessageComponent
+	if bp.pageMax <= 1 {
+		components = nil
+	} else {
+		bp.actionsRow = discordgo.ActionsRow{Components: []discordgo.MessageComponent{bp.PrevPageButton, bp.NextPageButton}}
+		components = append(components, bp.actionsRow)
+	}
+
+	if i, ok := trigger.(*discordgo.Interaction); ok {
+		if err := discord.InteractionRespondEmbed(i, filledFrame, components); err != nil {
+			return err
+		}
+		if attachedMsg, err := discord.InteractionResponse(i); err != nil {
+			return fmt.Errorf("failed loading attached message from interaction%w", err)
+		} else {
+			bp.AttachedMessage = attachedMsg
+		}
+	} else if m, ok := trigger.(*discordgo.Message); ok {
+		if attachedMessage, err := discord.ChannelMessageSendEmbed(m.ChannelID, filledFrame); err != nil {
+			return fmt.Errorf("failed loading attached message from message%w", err)
+		} else {
+			bp.AttachedMessage = attachedMessage
+		}
+	} else {
+		return errors.New("unknown trigger type, pager initialization failed")
+	}
+
+	return nil
+}
+
+// SwitchPage switch the page for a given pager.
+// no verification process involved
+func (bp *Pager) SwitchPage(a PagerAction, i *discordgo.Interaction) error {
+	//render page
+	switch a {
+	case PagerPrevPage:
+		newEmbed, err := bp.RenderPage(bp, bp.pageNow-1, bp.Limit, *bp.EmbedFrame)
+		if err != nil {
+			return err
+		}
+		bp.AttachedMessage.Embeds[0] = newEmbed
+	case PagerNextPage:
+		newEmbed, err := bp.RenderPage(bp, bp.pageNow+1, bp.Limit, *bp.EmbedFrame)
+		if err != nil {
+			return err
+		}
+		bp.AttachedMessage.Embeds[0] = newEmbed
+	}
+	//edit response
+	err := discord.InteractionRespondEditFromMessage(i, bp.AttachedMessage)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+type IPagerPart interface {
+	ToMessageEmbedField() *discordgo.MessageEmbedField
+}
+
+type CombinedKey string
+
+func CombinedKeyFromRaw(args ...string) CombinedKey {
+	tempKey := strings.Join(args, "-")
+	return CombinedKey(tempKey)
+}
+
+type DefaultPageRenderer struct{}
+
+func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFrame discordgo.MessageEmbed) (renderedEmbed *discordgo.MessageEmbed, err error) {
+	//prepare
+	totalSize := len(pager.completeItemSlice)
+	maxPage := totalSize / limit
+	//page logic
+	if totalSize%limit != 0 {
+		maxPage += 1
+	}
+	pager.pageMax = maxPage
+	//boundary limit
+	if toPage > maxPage {
+		toPage = 1
+	} else if toPage < 1 {
+		toPage = maxPage
+	}
+	//boundary limit 2: nothing to show
+	if totalSize == 0 {
+		embedFrame.Description = "Your query rendered 0 result. Nothing to show."
+		return &embedFrame, nil
+	}
+	//split slice
+	lowerLimit := (toPage - 1) * limit
+	upperLimit := toPage * limit
+	if toPage == maxPage {
+		upperLimit = len(pager.completeItemSlice)
+	}
+	pager.displayItemSlice = pager.completeItemSlice[lowerLimit:upperLimit]
+	//rendering
+	var alterFields []*discordgo.MessageEmbedField
+	for _, pagerPart := range pager.displayItemSlice {
+		var part = *pagerPart
+		alterFields = append(alterFields, part.ToMessageEmbedField())
+	}
+	embedFrame.Fields = alterFields
+	//no action row for only one page
+	if maxPage == 1 {
+	}
+	embedFrame.Footer = &discordgo.MessageEmbedFooter{Text: fmt.Sprintf("page: %d/%d", toPage, maxPage)}
+	//setup pageNow
+	pager.pageNow = toPage
+	return &embedFrame, nil
 }

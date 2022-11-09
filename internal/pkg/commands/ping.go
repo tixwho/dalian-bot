@@ -13,14 +13,14 @@ type PingCommand struct {
 	SlashCommand
 }
 
-func (cm *PingCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
+func (cm *PingCommand) MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
 	if i.ApplicationCommandData().Name == cm.AppCommandsMap["ping"].Name {
 		return true
 	}
 	return false
 }
 
-func (cm *PingCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
+func (cm *PingCommand) DoNamedInteraction(i *discordgo.InteractionCreate) (err error) {
 	discord.ChannelMessageSend(i.ChannelID, "pong response not using interaction!")
 	clients.DgSession.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,

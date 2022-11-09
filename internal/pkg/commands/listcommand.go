@@ -23,12 +23,12 @@ func (cm *ListCommand) DoComponent(i *discordgo.InteractionCreate) error {
 	return nil
 }
 
-func (cm *ListCommand) MatchInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
+func (cm *ListCommand) MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
 	status, _ := cm.DefaultMatchCommand(i)
 	return status
 }
 
-func (cm *ListCommand) DoInteraction(i *discordgo.InteractionCreate) (err error) {
+func (cm *ListCommand) DoNamedInteraction(i *discordgo.InteractionCreate) (err error) {
 
 	optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
 	names := make([]string, 0, len(CommandByName))
