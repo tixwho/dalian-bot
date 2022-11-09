@@ -7,13 +7,6 @@ import (
 	"log"
 )
 
-const (
-	EmbedColorNormal   = 0x33acff
-	EmbedColorQuestion = 0xffcb66
-	EmbedColorSuccess  = 0x3df53d
-	EmbedColorDanger   = 0xfa3838
-)
-
 // ChannelMessageSend A wrapper of discordgo ChannelMessageSend function.
 func ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
 	return clients.DgSession.ChannelMessageSend(channelID, content)
@@ -35,11 +28,12 @@ func InteractionRespondComplex(i *discordgo.Interaction, resp *discordgo.Interac
 }
 
 // InteractionRespondEmbed Shortcut method for fast reply including a MessageEmbed.
-func InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageEmbed) error {
+func InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) error {
 	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Embeds: []*discordgo.MessageEmbed{embed},
+			Embeds:     []*discordgo.MessageEmbed{embed},
+			Components: components,
 		},
 	})
 }
@@ -58,11 +52,18 @@ func InteractionResponse(i *discordgo.Interaction) (*discordgo.Message, error) {
 	return clients.DgSession.InteractionResponse(i)
 }
 
-func InteractionResponseEdit(i *discordgo.Interaction, newresp *discordgo.WebhookEdit) (*discordgo.Message, error) {
-	return clients.DgSession.InteractionResponseEdit(i, newresp)
+func InteractionResponseEdit(i *discordgo.Interaction, newresp *discordgo.WebhookEdit) error {
+	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseUpdateMessage,
+		Data: &discordgo.InteractionResponseData{
+			Content:    *newresp.Content,
+			Components: *newresp.Components,
+			Embeds:     *newresp.Embeds,
+		},
+	})
 }
 
-func InteractionResponseEditFromMessage(i *discordgo.Interaction, msg *discordgo.Message) (*discordgo.Message, error) {
+func InteractionRespondEditFromMessage(i *discordgo.Interaction, msg *discordgo.Message) error {
 	tempWebhookEdit := &discordgo.WebhookEdit{
 		Content:    &msg.Content,
 		Components: &msg.Components,
