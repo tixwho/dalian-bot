@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/confidential"
 	"github.com/goh-chunlin/go-onedrive/onedrive"
+	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 )
@@ -11,10 +12,10 @@ import (
 const (
 	clientId = "b730a7df-d993-4536-bc13-b5d5e5430bbc"
 	secret   = "5UY8Q~3bUT8nQmhPokBfksQ0GtodToS4RDzqhaed"
-	authCode = "0.AWsAhGcOaINWgkGQjTExuQ_VDt-nMLeT2TZFvBO11eVDC7xrAPs.AgABAAIAAAD--DLA3VO7QrddgJg7WevrAgDs_wQA9P8GqpLnqxEIp3ttQk6W7SUxSeGyVujOTKX69rQ87wN2-XUyyIGWRq5hbx7BfoGV-xE8S-90G5qQnC1oqRr8oLpX5CXtBOcwcL6Ne0z7SglHHYszB_d37nF5VTTo9CMZdv1ht8ano6-mzx4cJpOsWzeLbihBt201H3XPAoxwITMWUjR6cwhVsVUACcQwgiL48wmQYTuB1O04FRlIArvzGh4RqynT6pwZ9eLcUvTVHXLdwa-6Y1tuHyJ6ONMxa8Q79_NVhDkkvBmh2lIX6n6D-ImDwsuFGSUDJ8PYphq7v12Gpf9_l6LNcF1mireVvGtMI5VDiFBvgV2mdb2T0MxNWBH47xQQxORNhUtfqpf62ZMDLYEOZbvWcsLsAy1QlbVnyY4tSgO6r-yk7GKB-izv8bdbz9f-YLuJGVl0HFZWFPdfZMFwCs8oKiYlyXB7gA6eBVWwaGYsPeT8JqdzM3Ghnii6FC_PIu7tfncUXkxYzSYKhj3jaOuizoUNQo2kveS__3KjMj7p47Dfguh2Ad00k0oWsffAKNi_K3X1MPIOHYORXhhsjZJ9My9gFJlKrR6LatH73An7MCnFtYy5y9w_3EsDzcul1lTfl089UdNjFcB33h1a4FBUgdrO-hWg45hr5uwS2UoTkdQ"
 )
 
 var accessToken string
+var onedriveClient *onedrive.Client
 
 func Login() error {
 	// Initializing the client credential
@@ -59,9 +60,24 @@ func Login2() error {
 	} else {
 		fmt.Printf("auth2 code prompt URL created:\r\n%s\r\n", auth2PromptUrl)
 	}
-	fmt.Println("Please enter AuthCode:")
-	//Scanln doesn't work in testing.
 	// fmt.Scanln(&authCode)
+	return nil
+
+}
+
+func LoginGetToken(authCode string) error {
+	cred, err := confidential.NewCredFromSecret(secret)
+	if err != nil {
+		return fmt.Errorf("could not create a cred from a secret: %w", err)
+	} else {
+		fmt.Printf("cred created:%v\r\n", cred)
+	}
+	confidentialClientApp, err := confidential.New(clientId, cred, confidential.WithAuthority("https://login.microsoftonline.com/common"))
+	if err != nil {
+		return fmt.Errorf("could not create a app from a credentials: %w", err)
+	} else {
+		fmt.Printf("client created:%v\r\n", confidentialClientApp)
+	}
 	authRes, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), authCode, "http://localhost/myapp/", []string{"Files.ReadWrite.All"})
 	if err != nil {
 		return fmt.Errorf("could not auth from a credentials: %w", err)
@@ -87,7 +103,32 @@ func Storage() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(drives.Drives)
+	onedriveClient = client
+	fmt.Println(drives.Drives[0].Owner)
+	fmt.Println(drives.ODataContext)
+	fmt.Println(drives.Drives[0].Id)
 	return nil
+}
 
+func ListFiles() error {
+	items, err := onedriveClient.DriveItems.List(context.Background(), "01MYC6HNVG2BYQ5L3VJJDJYZ2V3GOSHWAM")
+	if err != nil {
+		return errors.Wrap(err, "error retrieving items through basin id")
+	}
+	for _, item := range items.DriveItems {
+		fmt.Println("item:" + item.Name + "||" + item.Id)
+	}
+	//actually, parentFolderID
+	newFolderItem, err := onedriveClient.DriveItems.CreateNewFolder(context.Background(), "", "01MYC6HNVG2BYQ5L3VJJDJYZ2V3GOSHWAM", "Go Generated Folder")
+	if err != nil {
+		return errors.Wrap(err, "Failed creating testing folder")
+	}
+	fmt.Println("testing folder name:" + newFolderItem.Name + "||" + newFolderItem.Id)
+	onedriveClient.DriveItems.Delete(context.Background(), "", newFolderItem.Id)
+	err = onedriveClient.DriveItems.Delete(context.Background(), "", newFolderItem.Id)
+	if err != nil {
+		return errors.Wrap(err, "failed deleting testing folder")
+	}
+
+	return nil
 }
