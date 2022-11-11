@@ -2,6 +2,8 @@
 
 Discord bot w/ various housekeeping functions, written in Golang.
 
+In active development. Powered by [disrord.go](https://github.com/bwmarrin/discordgo) framework.
+
 ## Functions 
 
 #### Utilities
@@ -16,7 +18,7 @@ Discord bot w/ various housekeeping functions, written in Golang.
 
 ## Directory struct
 
-### Code Directory
+### Code directory
 
 1. pkg
    1. clients: lower-level clients for intereaction
