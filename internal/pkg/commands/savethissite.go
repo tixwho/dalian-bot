@@ -108,7 +108,7 @@ func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate
 			query["tags"] = bson.M{"$all": parsedTags}
 
 		}
-		findOpts := options.Find().SetSort(bson.D{{"id", -1}})
+		findOpts := options.Find().SetSort(bson.D{{"id", 1}})
 		siteCollectionPager := Pager{
 			IPagerLoader: &sitePoPagerLoader{
 				context:        context.Background(),
@@ -133,6 +133,7 @@ func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate
 				Color:     discord.EmbedColorNormal,
 				Timestamp: time.Now().Format(time.RFC3339),
 			},
+			Overtime: time.Duration(5) * time.Minute,
 		}
 		siteCollectionPager.Setup(i.Interaction)
 		if siteCollectionPager.pageMax > 1 {
@@ -342,13 +343,15 @@ func (l *listSiteStage) process() {
 				//this should never be called
 				fmt.Println(interaction.Data)
 				return
-			case <-time.After(time.Duration(5) * time.Minute):
+			case <-time.After(l.LsPager.Overtime):
 				//overtime termination sign
 				fmt.Println("terminating through overtime")
 				return
 			}
 		}
 	}()
+	//lock buttons. requires additional resources
+	l.LsPager.LockPagerButtons()
 	l.MainCommand.ActiveListSiteStageMap.disposeListSiteStage(newListStageKeyFromRaw(l.LsPager.AttachedMessage.ID, l.UserID))
 }
 
@@ -562,7 +565,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 					query["tags"] = bson.M{"$all": flagMap["tag"]}
 				}
 			}
-			findOpts := options.Find().SetSort(bson.D{{"id", -1}})
+			findOpts := options.Find().SetSort(bson.D{{"id", 1}})
 			findCursor, err := data.GetCollection("site_collection").Find(context.TODO(), query, findOpts)
 			var results sitePoArr
 			if err = findCursor.All(context.TODO(), &results); err != nil {
@@ -622,7 +625,7 @@ type SitePO struct {
 
 func (sp *SitePO) ToMessageEmbedField() *discordgo.MessageEmbedField {
 	return &discordgo.MessageEmbedField{
-		Name:   fmt.Sprintf("Temporary Title"),
+		Name:   fmt.Sprintf("%d. Temporary Title", sp.ID),
 		Value:  sp.essentialInfoForEmbed(),
 		Inline: false,
 	}
@@ -670,7 +673,7 @@ func (sp *SitePO) essentialInfoForEmbed() string {
 	}
 	essentialInfo := "%s\r" +
 		"Tags: %s\r" +
-		" Note: %s"
+		"Note: %s"
 	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
 }
 

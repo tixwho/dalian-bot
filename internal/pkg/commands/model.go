@@ -4,6 +4,7 @@ Package commands includes all interfaces, strucs and implementations of various 
 package commands
 
 import (
+	"dalian-bot/internal/pkg/clients"
 	"dalian-bot/internal/pkg/discord"
 	"errors"
 	"fmt"
@@ -373,6 +374,8 @@ type Pager struct {
 	EmbedFrame *discordgo.MessageEmbed
 	//Customized pagination button
 	PrevPageButton, NextPageButton discordgo.Button
+	//Overtime time to expire the pager
+	Overtime time.Duration
 	//only used when not lazy loading
 	completeItemSlice []*IPagerPart
 	displayItemSlice  []*IPagerPart
@@ -447,6 +450,31 @@ func (bp *Pager) SwitchPage(a PagerAction, i *discordgo.Interaction) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// LockPagerButtons disable buttons of the pager
+// todo: make it actually works
+func (bp *Pager) LockPagerButtons() error {
+	//new array with disabled buttons
+	var components []discordgo.MessageComponent
+	bp.PrevPageButton.Disabled = true
+	bp.NextPageButton.Disabled = true
+	bp.actionsRow = discordgo.ActionsRow{Components: []discordgo.MessageComponent{bp.PrevPageButton, bp.NextPageButton}}
+	components = append(components, bp.actionsRow)
+
+	//raw edit.
+	editedMsg, err := clients.DgSession.ChannelMessageEditComplex(&discordgo.MessageEdit{
+		Content:    &bp.AttachedMessage.Content,
+		Components: components,
+		Embeds:     bp.AttachedMessage.Embeds,
+		ID:         bp.AttachedMessage.ID,
+		Channel:    bp.AttachedMessage.ChannelID,
+	})
+	if err != nil {
+		return err
+	}
+	bp.AttachedMessage = editedMsg
 	return nil
 }
 
