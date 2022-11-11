@@ -2,7 +2,21 @@
 
 Discord bot w/ various housekeeping functions, written in Golang.
 
-## Code Directory struct
+## Functions 
+
+#### Utilities
+* website-archiving (/save-site): Archive given website with tags and notes. 
+  * Scroll archived sites in an interactive way (/list-site)
+  * A snapshot is generated and stored into onedrive (in dev)
+  * Automatically store *every* website in the given channel (in dev)
+
+#### For fun
+* **WHAT** (what): repeat the last message with bold font
+
+
+## Directory struct
+
+### Code Directory
 
 1. pkg
    1. clients: lower-level clients for intereaction
@@ -14,8 +28,9 @@ Discord bot w/ various housekeeping functions, written in Golang.
    5. lifecycle.go: very self-explanatory.
 2. main.go: entry function.
 
-## Other directories
+### Non-code directories
 parallel to the executable file.
 1. config: storing configurations for the bot.
    1. credentials.yaml: see credentials_format.yaml
-2. static: storing permanent static files, usually for testing & testing command purposes.
+2. static: storing permanent static files other than config, usually for testing & testing command
+purposes.
