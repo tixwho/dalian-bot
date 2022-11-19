@@ -54,7 +54,7 @@ func Login2() error {
 	} else {
 		fmt.Printf("client created:%v\r\n", confidentialClientApp)
 	}
-	auth2PromptUrl, err := confidentialClientApp.AuthCodeURL(context.Background(), clientId, "http://localhost/myapp/", []string{"Files.ReadWrite.All"})
+	auth2PromptUrl, err := confidentialClientApp.AuthCodeURL(context.Background(), clientId, "http://localhost/myapp/", []string{"Files.ReadWrite.All", "offline_access"})
 	if err != nil {
 		return fmt.Errorf("could not create a redirectUrl: %w", err)
 	} else {
@@ -78,7 +78,7 @@ func LoginGetToken(authCode string) error {
 	} else {
 		fmt.Printf("client created:%v\r\n", confidentialClientApp)
 	}
-	authRes, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), authCode, "http://localhost/myapp/", []string{"Files.ReadWrite.All"})
+	authRes, err := confidentialClientApp.AcquireTokenByAuthCode(context.Background(), authCode, "http://localhost/myapp/", []string{"Files.ReadWrite.All", "offline_access"})
 	if err != nil {
 		return fmt.Errorf("could not auth from a credentials: %w", err)
 	}
@@ -130,5 +130,11 @@ func ListFiles() error {
 		return errors.Wrap(err, "failed deleting testing folder")
 	}
 
+	return nil
+}
+
+func UploadFile() error {
+	LocalFilePath := "I:\\Records\\11\\舒拉·布尔京：摸索黑暗中的群像——为什么俄罗斯人支持这场战争？_凤凰网 (2022_11_12 00_38_41).html"
+	onedriveClient.DriveItems.UploadNewFile(context.Background(), "", "01MYC6HNVG2BYQ5L3VJJDJYZ2V3GOSHWAM", LocalFilePath)
 	return nil
 }

@@ -14,6 +14,8 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 )
 
+replace github.com/goh-chunlin/go-onedrive => github.com/tixwho/go-onedrive v1.1.1-beta
+
 require (
 	github.com/golang-jwt/jwt/v4 v4.4.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect

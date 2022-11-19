@@ -56,8 +56,15 @@ func TestLogin2(t *testing.T) {
 	stateError(t, Storage())
 }
 
+/*
 func TestListFiles(t *testing.T) {
 	stateError(t, ListFiles())
+}
+
+*/
+
+func TestUploadFile(t *testing.T) {
+	stateError(t, UploadFile())
 }
 
 func stateError(t *testing.T, err error) {
