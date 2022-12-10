@@ -6,7 +6,6 @@ import (
 	"dalian-bot/internal/pkg/services/ddtv"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
-	"github.com/gin-contrib/secure"
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -55,9 +54,10 @@ func InitDalian() error {
 	/* Setup Api Server */
 	engine := gin.Default()
 	//allow only redirection
-	engine.Use(secure.New(secure.Config{
-		AllowedHosts: []string{"165.232.129.202"},
-	}))
+	engine.SetTrustedProxies([]string{"165.232.129.202"})
+	//engine.Use(secure.New(secure.Config{
+	//	AllowedHosts: []string{"165.232.129.202"},
+	//}))
 	ddtv.InitDDTVHook(engine)
 	clients.GinEngine = engine
 	go clients.GinEngine.Run(":8740")

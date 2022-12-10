@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/AzureAD/microsoft-authentication-library-for-go v0.7.0
 	github.com/bwmarrin/discordgo v0.26.1
-	github.com/gin-contrib/secure v0.0.1
 	github.com/gin-gonic/gin v1.8.1
 	github.com/goh-chunlin/go-onedrive v1.1.1
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
