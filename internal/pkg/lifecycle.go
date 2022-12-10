@@ -3,8 +3,11 @@ package pkg
 import (
 	"dalian-bot/internal/pkg/clients"
 	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/ddtv"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"github.com/gin-contrib/secure"
+	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/net/context"
@@ -49,6 +52,16 @@ func InitDalian() error {
 
 	/* Setup Cron from database --reserved-- */
 
+	/* Setup Api Server */
+	engine := gin.Default()
+	//allow only redirection
+	engine.Use(secure.New(secure.Config{
+		AllowedHosts: []string{"165.232.129.202"},
+	}))
+	ddtv.InitDDTVHook(engine)
+	clients.GinEngine = engine
+	go clients.GinEngine.Run(":8740")
+
 	/* Dalian specific setups */
 	commands.SetPrefix("$")
 	commands.SetSeparator("$")
@@ -71,7 +84,6 @@ func GracefulShutDalian() error {
 	}()
 	commands.DisposeSlashCommands()
 	clients.DgSession.Close()
-	fmt.Println("Connection closed!")
 	return nil
 }
 

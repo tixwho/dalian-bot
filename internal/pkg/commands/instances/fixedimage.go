@@ -1,16 +1,17 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/discord"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/discord"
 	"github.com/bwmarrin/discordgo"
 	"os"
 )
 
 type FixedImageCommand struct {
-	Command
-	PlainCommand
-	ArgCommand
+	commands.Command
+	commands.PlainCommand
+	commands.ArgCommand
 	imageMap map[string]string
 }
 
@@ -28,7 +29,7 @@ func (cm *FixedImageCommand) New() {
 }
 
 func (cm *FixedImageCommand) DoMessage(m *discordgo.MessageCreate) error {
-	args, argCount := cm.SeparateArgs(m.Message.Content, Separator)
+	args, argCount := cm.SeparateArgs(m.Message.Content, commands.Separator)
 	if argCount <= 1 {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "not enough arguments!")
 		return nil
@@ -50,5 +51,5 @@ func (cm *FixedImageCommand) DoMessage(m *discordgo.MessageCreate) error {
 func init() {
 	var fic FixedImageCommand
 	fic.New()
-	RegisterCommand(&fic)
+	commands.RegisterCommand(&fic)
 }

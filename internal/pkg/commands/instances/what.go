@@ -1,15 +1,16 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
+	"dalian-bot/internal/pkg/commands"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"regexp"
 )
 
 type WhatCommand struct {
-	Command
-	RegexTextCommand
+	commands.Command
+	commands.RegexTextCommand
 }
 
 func (cm *WhatCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
@@ -54,5 +55,5 @@ func findFirstNonBotMsg(messages []*discordgo.Message) (*discordgo.Message, bool
 func init() {
 	var whatCommand WhatCommand
 	whatCommand.New()
-	RegisterCommand(&whatCommand)
+	commands.RegisterCommand(&whatCommand)
 }

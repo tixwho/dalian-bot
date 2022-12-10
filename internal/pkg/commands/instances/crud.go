@@ -1,8 +1,9 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/data"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/data"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -13,10 +14,10 @@ import (
 )
 
 type CrudCommand struct {
-	Command
-	PlainCommand
-	ArgCommand
-	FlagCommand
+	commands.Command
+	commands.PlainCommand
+	commands.ArgCommand
+	commands.FlagCommand
 }
 
 func (c *CrudCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool) {
@@ -31,43 +32,43 @@ const (
 func (c *CrudCommand) New() {
 	c.Name = "crud"
 	c.Identifiers = []string{"crud", "crud-second"}
-	c.AvailableFlagMap = make(map[string]*CommandFlag)
-	c.RegisterCommandFlag(CommandFlag{
+	c.AvailableFlagMap = make(map[string]*commands.CommandFlag)
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "create",
 		FlagPrefix:       []string{"c", "create"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{CRUDOperation},
 	})
-	c.RegisterCommandFlag(CommandFlag{
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "update",
 		FlagPrefix:       []string{"u", "update"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{CRUDOperation},
 	})
-	c.RegisterCommandFlag(CommandFlag{
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "read",
 		FlagPrefix:       []string{"r", "read"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{CRUDOperation},
 	})
-	c.RegisterCommandFlag(CommandFlag{
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "delete",
 		FlagPrefix:       []string{"d", "delete"},
 		AcceptsExtraArg:  false,
 		MultipleExtraArg: false,
 		MEGroup:          []string{CRUDOperation},
 	})
-	c.RegisterCommandFlag(CommandFlag{
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "free",
 		FlagPrefix:       []string{"f", "free"},
 		AcceptsExtraArg:  true,
 		MultipleExtraArg: false,
 		MEGroup:          []string{},
 	})
-	c.RegisterCommandFlag(CommandFlag{
+	c.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "one_argument",
 		FlagPrefix:       []string{"one", "one_argument"},
 		AcceptsExtraArg:  true,
@@ -95,7 +96,7 @@ func newTestStruct(createEvent *discordgo.MessageCreate) CrudTestStruct {
 }
 
 func (c *CrudCommand) DoMessage(m *discordgo.MessageCreate) error {
-	args, argCount := c.SeparateArgs(m.Content, Separator)
+	args, argCount := c.SeparateArgs(m.Content, commands.Separator)
 	/* Handle Flags */
 	flagMap, err := c.ParseFlags(args[0])
 	if err != nil {
@@ -174,5 +175,5 @@ func (c *CrudCommand) DoMessage(m *discordgo.MessageCreate) error {
 func init() {
 	var crud CrudCommand
 	crud.New()
-	RegisterCommand(&crud)
+	commands.RegisterCommand(&crud)
 }

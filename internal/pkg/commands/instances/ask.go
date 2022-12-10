@@ -1,7 +1,8 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
+	"dalian-bot/internal/pkg/commands"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -10,11 +11,11 @@ import (
 )
 
 type AskCommand struct {
-	Command
+	commands.Command
 	//handle the trigger event
-	PlainCommand
+	commands.PlainCommand
 	//handling subsequent steps
-	BotCallingCommand
+	commands.BotCallingCommand
 	//channel:asking
 	ActiveAsks map[string]*AskStage
 }
@@ -29,7 +30,7 @@ func (cm *AskCommand) MatchMessage(message *discordgo.MessageCreate) (bool, bool
 }
 
 type AskStage struct {
-	BasicStageInfo
+	commands.BasicStageInfo
 	ProcessMsgChan chan *discordgo.Message
 	MainCommand    *AskCommand
 }
@@ -79,7 +80,7 @@ func (cm *AskCommand) DoMessage(m *discordgo.MessageCreate) error {
 	if aa, ok := cm.ActiveAsks[m.Author.ID]; !ok {
 		cm.insertAsk(m)
 		return nil
-	} else if strings.HasPrefix(m.Content, Prefix) {
+	} else if strings.HasPrefix(m.Content, commands.Prefix) {
 		clients.DgSession.ChannelMessageSend(m.ChannelID, "Detected another command, force abort")
 		cm.disposeAsk(m.Author.ID)
 	} else if callingBot, _ := cm.IsCallingBot(m.Content); callingBot {
@@ -117,5 +118,5 @@ func (cm *AskCommand) disposeAsk(userID string) error {
 func init() {
 	var ask AskCommand
 	ask.New()
-	RegisterCommand(&ask)
+	commands.RegisterCommand(&ask)
 }

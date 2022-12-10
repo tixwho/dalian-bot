@@ -1,8 +1,9 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/discord"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/discord"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"strings"
@@ -10,10 +11,10 @@ import (
 )
 
 type ListCommand struct {
-	Command
-	PlainCommand
-	SlashCommand
-	ComponentCommand
+	commands.Command
+	commands.PlainCommand
+	commands.SlashCommand
+	commands.ComponentCommand
 }
 
 func (cm *ListCommand) DoComponent(i *discordgo.InteractionCreate) error {
@@ -31,15 +32,15 @@ func (cm *ListCommand) MatchNamedInteraction(i *discordgo.InteractionCreate) (is
 func (cm *ListCommand) DoNamedInteraction(i *discordgo.InteractionCreate) (err error) {
 
 	optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
-	names := make([]string, 0, len(CommandByName))
+	names := make([]string, 0, len(commands.CommandByName))
 	if option, ok := optionsMap["qualifier"]; ok {
-		for k := range CommandByName {
+		for k := range commands.CommandByName {
 			if strings.Contains(k, option.StringValue()) {
 				names = append(names, k)
 			}
 		}
 	} else {
-		for k := range CommandByName {
+		for k := range commands.CommandByName {
 			names = append(names, k)
 		}
 	}
@@ -73,7 +74,7 @@ func (cm *ListCommand) New() {
 			},
 		},
 	}
-	cm.CompActionMap = make(ComponentActionMap)
+	cm.CompActionMap = make(commands.ComponentActionMap)
 	cm.CompActionMap["list-command-good"] = func(i *discordgo.InteractionCreate) {
 		if i.Message != nil {
 			i.Message.Embeds[0].Color = discord.EmbedColorSuccess
@@ -128,8 +129,8 @@ func (cm *ListCommand) New() {
 }
 
 func (cm *ListCommand) DoMessage(m *discordgo.MessageCreate) error {
-	names := make([]string, 0, len(CommandByName))
-	for k := range CommandByName {
+	names := make([]string, 0, len(commands.CommandByName))
+	for k := range commands.CommandByName {
 		names = append(names, k)
 	}
 	var fields []*discordgo.MessageEmbedField
@@ -219,5 +220,5 @@ func (cm *ListCommand) DoMessage(m *discordgo.MessageCreate) error {
 func init() {
 	var lc ListCommand
 	lc.New()
-	RegisterCommand(&lc)
+	commands.RegisterCommand(&lc)
 }

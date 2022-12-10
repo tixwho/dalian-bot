@@ -1,16 +1,17 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/discord"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/discord"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 )
 
 type PingCommand struct {
-	Command
-	PlainCommand
-	SlashCommand
+	commands.Command
+	commands.PlainCommand
+	commands.SlashCommand
 }
 
 func (cm *PingCommand) MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool) {
@@ -58,5 +59,5 @@ func (cm *PingCommand) DoMessage(m *discordgo.MessageCreate) error {
 func init() {
 	var pc PingCommand
 	pc.New()
-	RegisterCommand(&pc)
+	commands.RegisterCommand(&pc)
 }

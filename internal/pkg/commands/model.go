@@ -5,7 +5,7 @@ package commands
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/discord"
+	"dalian-bot/internal/pkg/services/discord"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -369,7 +369,7 @@ type Pager struct {
 	//autofilled later
 	AttachedMessage *discordgo.Message
 	//pagination cache. need fo fill Limit
-	pageNow, pageMax, Limit int
+	PageNow, PageMax, Limit int
 	//embed rendering skeleton
 	EmbedFrame *discordgo.MessageEmbed
 	//Customized pagination button
@@ -377,7 +377,7 @@ type Pager struct {
 	//Overtime time to expire the pager
 	Overtime time.Duration
 	//only used when not lazy loading
-	completeItemSlice []*IPagerPart
+	CompleteItemSlice []*IPagerPart
 	displayItemSlice  []*IPagerPart
 	//calculated actionsRow
 	actionsRow discordgo.ActionsRow
@@ -391,21 +391,25 @@ func (bp *Pager) Setup(trigger any) error {
 	}
 
 	//initialize first page
-	filledFrame, err := bp.IPagerLoader.RenderPage(bp, bp.pageNow, bp.Limit, *bp.EmbedFrame)
+	filledFrame, err := bp.IPagerLoader.RenderPage(bp, bp.PageNow, bp.Limit, *bp.EmbedFrame)
 	if err != nil {
 		return err
 	}
 
 	//initialize buttons
 	var components []discordgo.MessageComponent
-	if bp.pageMax <= 1 {
+	if bp.PageMax <= 1 {
+		//no buttons rendered for only one page
 		components = nil
 	} else {
+		//setup pagination buttons otherwise
 		bp.actionsRow = discordgo.ActionsRow{Components: []discordgo.MessageComponent{bp.PrevPageButton, bp.NextPageButton}}
 		components = append(components, bp.actionsRow)
 	}
 
+	//work for both Interaction(Slash commands) and raw trigger
 	if i, ok := trigger.(*discordgo.Interaction); ok {
+		//Interaction (Slash)
 		if err := discord.InteractionRespondEmbed(i, filledFrame, components); err != nil {
 			return err
 		}
@@ -415,6 +419,7 @@ func (bp *Pager) Setup(trigger any) error {
 			bp.AttachedMessage = attachedMsg
 		}
 	} else if m, ok := trigger.(*discordgo.Message); ok {
+		//Raw command (Message)
 		if attachedMessage, err := discord.ChannelMessageSendEmbed(m.ChannelID, filledFrame); err != nil {
 			return fmt.Errorf("failed loading attached message from message%w", err)
 		} else {
@@ -433,13 +438,13 @@ func (bp *Pager) SwitchPage(a PagerAction, i *discordgo.Interaction) error {
 	//render page
 	switch a {
 	case PagerPrevPage:
-		newEmbed, err := bp.RenderPage(bp, bp.pageNow-1, bp.Limit, *bp.EmbedFrame)
+		newEmbed, err := bp.RenderPage(bp, bp.PageNow-1, bp.Limit, *bp.EmbedFrame)
 		if err != nil {
 			return err
 		}
 		bp.AttachedMessage.Embeds[0] = newEmbed
 	case PagerNextPage:
-		newEmbed, err := bp.RenderPage(bp, bp.pageNow+1, bp.Limit, *bp.EmbedFrame)
+		newEmbed, err := bp.RenderPage(bp, bp.PageNow+1, bp.Limit, *bp.EmbedFrame)
 		if err != nil {
 			return err
 		}
@@ -454,7 +459,6 @@ func (bp *Pager) SwitchPage(a PagerAction, i *discordgo.Interaction) error {
 }
 
 // LockPagerButtons disable buttons of the pager
-// todo: make it actually works
 func (bp *Pager) LockPagerButtons() error {
 	//new array with disabled buttons
 	var components []discordgo.MessageComponent
@@ -493,13 +497,13 @@ type DefaultPageRenderer struct{}
 
 func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFrame discordgo.MessageEmbed) (renderedEmbed *discordgo.MessageEmbed, err error) {
 	//prepare
-	totalSize := len(pager.completeItemSlice)
+	totalSize := len(pager.CompleteItemSlice)
 	maxPage := totalSize / limit
 	//page logic
 	if totalSize%limit != 0 {
 		maxPage += 1
 	}
-	pager.pageMax = maxPage
+	pager.PageMax = maxPage
 	//boundary limit
 	if toPage > maxPage {
 		toPage = 1
@@ -515,9 +519,9 @@ func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFram
 	lowerLimit := (toPage - 1) * limit
 	upperLimit := toPage * limit
 	if toPage == maxPage {
-		upperLimit = len(pager.completeItemSlice)
+		upperLimit = len(pager.CompleteItemSlice)
 	}
-	pager.displayItemSlice = pager.completeItemSlice[lowerLimit:upperLimit]
+	pager.displayItemSlice = pager.CompleteItemSlice[lowerLimit:upperLimit]
 	//rendering
 	var alterFields []*discordgo.MessageEmbedField
 	for _, pagerPart := range pager.displayItemSlice {
@@ -525,11 +529,36 @@ func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFram
 		alterFields = append(alterFields, part.ToMessageEmbedField())
 	}
 	embedFrame.Fields = alterFields
-	//no action row for only one page
-	if maxPage == 1 {
-	}
 	embedFrame.Footer = &discordgo.MessageEmbedFooter{Text: fmt.Sprintf("page: %d/%d", toPage, maxPage)}
 	//setup pageNow
-	pager.pageNow = toPage
+	pager.PageNow = toPage
 	return &embedFrame, nil
+}
+
+type ICacheCommand interface {
+	RefreshAllCache() error
+	RefreshCache(cacheIdentifier string) error
+}
+
+type CacheCommand struct {
+	cacheRefreshMap map[string]func() error
+}
+
+func (cm *CacheCommand) RefreshAllCache() error {
+	for id, functionIn := range cm.cacheRefreshMap {
+		if err := functionIn(); err != nil {
+			return fmt.Errorf("cache refreshment failed for %s", id)
+		}
+	}
+	return nil
+}
+
+func (cm *CacheCommand) RefreshCache(cacheIdentifier string) error {
+	if functionIn, exist := cm.cacheRefreshMap[cacheIdentifier]; !exist {
+		return fmt.Errorf("no cache named %s", cacheIdentifier)
+	} else {
+		return functionIn()
+	}
+	//should not reach
+	return nil
 }

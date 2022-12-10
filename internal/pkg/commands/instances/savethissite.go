@@ -1,9 +1,10 @@
-package commands
+package instances
 
 import (
 	"dalian-bot/internal/pkg/clients"
-	"dalian-bot/internal/pkg/data"
-	"dalian-bot/internal/pkg/discord"
+	"dalian-bot/internal/pkg/commands"
+	"dalian-bot/internal/pkg/services/data"
+	discord2 "dalian-bot/internal/pkg/services/discord"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"github.com/pkg/errors"
@@ -23,25 +24,25 @@ var stageOvertime = 30
 
 type SaveThisSiteCommand struct {
 	//basic function
-	Command
+	commands.Command
 	//manual way of trigger
-	PlainCommand
+	commands.PlainCommand
 	//multiple args required for manual when necessary
-	ArgCommand
+	commands.ArgCommand
 	//flag support for manual trigger
-	FlagCommand
+	commands.FlagCommand
 	//implicit way to trigger
-	RegexTextCommand
+	commands.RegexTextCommand
 	//stepped support for implicit trigger
-	BotCallingCommand
+	commands.BotCallingCommand
 	//Map containing active implicit collecting process
 	ActiveSaveSitetageMap saveSitestageMap
 	//Map containing active ls-site process
 	ActiveListSiteStageMap listSitestageMap
 	//Slash Command support
-	SlashCommand
+	commands.SlashCommand
 	//Component support for page rendering //todo: fill the action
-	ComponentCommand
+	commands.ComponentCommand
 }
 
 func (cm *SaveThisSiteCommand) DoComponent(i *discordgo.InteractionCreate) error {
@@ -67,7 +68,7 @@ func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate
 	case "save-site":
 		optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
 		if _, err := url.ParseRequestURI(optionsMap["url"].StringValue()); err != nil {
-			discord.InteractionRespond(i.Interaction, "You must provide a *valid* url!")
+			discord2.InteractionRespond(i.Interaction, "You must provide a *valid* url!")
 			return nil
 		}
 		//validation passed, start the logic
@@ -76,21 +77,21 @@ func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate
 		sitePO.Site = optionsMap["url"].StringValue()
 		//set tags
 		if tagsOption, ok := optionsMap["tags"]; ok {
-			ephemeralTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
+			ephemeralTags, _ := cm.SeparateArgs(tagsOption.StringValue(), commands.Separator)
 			sitePO.Tags = ephemeralTags
 		}
 		if tagsOption, ok := optionsMap["note"]; ok {
 			sitePO.Note = tagsOption.StringValue()
 		}
 		//save it to the database
-		go persistSitePo(sitePO, true)
+		go insertSitePo(sitePO, true)
 		// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
 		//TODO: snapshot things.
-		discord.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
+		discord2.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
 			Title:       "Site saved",
 			Description: "The following site has been saved",
 			Timestamp:   time.Now().Format(time.RFC3339),
-			Color:       discord.EmbedColorNormal,
+			Color:       discord2.EmbedColorNormal,
 			Fields: []*discordgo.MessageEmbedField{{
 				Name:   "Temp Title",
 				Value:  sitePO.essentialInfoForEmbed(),
@@ -104,40 +105,153 @@ func (cm *SaveThisSiteCommand) DoNamedInteraction(i *discordgo.InteractionCreate
 		//if found optional tags, add it to the query
 		//set tags
 		if tagsOption, ok := optionsMap["tags"]; ok {
-			parsedTags, _ := cm.SeparateArgs(tagsOption.StringValue(), Separator)
+			parsedTags, _ := cm.SeparateArgs(tagsOption.StringValue(), commands.Separator)
 			query["tags"] = bson.M{"$all": parsedTags}
 
 		}
 		findOpts := options.Find().SetSort(bson.D{{"id", 1}})
-		siteCollectionPager := Pager{
+		siteCollectionPager := commands.Pager{
 			IPagerLoader: &sitePoPagerLoader{
 				context:        context.Background(),
 				query:          query,
 				queryOptions:   []*options.FindOptions{findOpts},
 				resultsStorage: []*SitePO{},
 			},
-			pageNow: 1,
+			PageNow: 1,
 			Limit:   7,
 			PrevPageButton: discordgo.Button{
-				Label:    discord.EmojiLeftArrow,
+				Label:    discord2.EmojiLeftArrow,
 				Style:    discordgo.PrimaryButton,
 				CustomID: lsButtonIDPrev,
 			},
 			NextPageButton: discordgo.Button{
-				Label:    discord.EmojiRightArrow,
+				Label:    discord2.EmojiRightArrow,
 				Style:    discordgo.PrimaryButton,
 				CustomID: lsButtonIDNext,
 			},
 			EmbedFrame: &discordgo.MessageEmbed{
 				Title:     "ls-site result",
-				Color:     discord.EmbedColorNormal,
+				Color:     discord2.EmbedColorNormal,
 				Timestamp: time.Now().Format(time.RFC3339),
 			},
 			Overtime: time.Duration(5) * time.Minute,
 		}
 		siteCollectionPager.Setup(i.Interaction)
-		if siteCollectionPager.pageMax > 1 {
+		if siteCollectionPager.PageMax > 1 {
 			cm.ActiveListSiteStageMap.insertListSiteStage(i.Member.User.ID, siteCollectionPager, cm)
+		}
+	case "modify-site":
+		//todo: finish this
+		optionsMap := cm.ParseOptionsMap(i.ApplicationCommandData().Options)
+		id, ok := optionsMap["id"]
+		if !ok {
+			discord2.InteractionRespond(i.Interaction, "no ID provided!")
+			return nil
+		}
+		modifyingPo, err := retrieveSitePoByNumericalID(id.IntValue())
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				discord2.InteractionRespond(i.Interaction, "ID doesn't exist!")
+				return nil
+			}
+			discord2.InteractionRespond(i.Interaction, err.Error())
+			return nil
+		}
+		if modifyingPo.UserID != i.Member.User.ID {
+			discord2.InteractionRespond(i.Interaction, "Sorry, this document belongs to another user.")
+			return nil
+		}
+		tags, ok := optionsMap["tags"]
+		if ok {
+			tagsStr := tags.StringValue()
+			if tagsStr == "-" {
+				//clean up
+				modifyingPo.Tags = []string{}
+			} else {
+				ephemeralTags, _ := cm.SeparateArgs(tagsStr, commands.Separator)
+				modifyingPo.Tags = ephemeralTags
+			}
+		}
+		note, ok := optionsMap["note"]
+		if ok {
+			noteStr := note.StringValue()
+			if noteStr == "-" {
+				//clean up
+				modifyingPo.Note = ""
+			} else {
+				modifyingPo.Note = noteStr
+			}
+		}
+		_, err = updateSitePo(*modifyingPo)
+		if err != nil {
+			discord2.InteractionRespond(i.Interaction, err.Error())
+			return nil
+		}
+		discord2.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
+			Title:       "Site record updated",
+			Description: "The following site has been updated",
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Color:       discord2.EmbedColorNormal,
+			Fields: []*discordgo.MessageEmbedField{{
+				Name:   "Temp title",
+				Value:  modifyingPo.essentialInfoForEmbed(),
+				Inline: false,
+			}},
+		}, nil)
+
+	case "update-site-snapshot":
+		opts := i.ApplicationCommandData().Options
+		switch opts[0].Name {
+		case "refresh-snapshot":
+			//optionsMap := cm.ParseOptionsMap(opts[0].Options)
+			//id, ok := optionsMap["id"]
+			//if !ok {
+			//	discord.InteractionRespond(i.Interaction, "no ID provided!")
+			//	return nil
+			//}
+		case "update-snapshot-url":
+			optionsMap := cm.ParseOptionsMap(opts[0].Options)
+			id, ok := optionsMap["id"]
+			if !ok {
+				discord2.InteractionRespond(i.Interaction, "no ID provided!")
+				return nil
+			}
+			snapshotUrl, ok := optionsMap["snapshot-url"]
+			if !ok {
+				discord2.InteractionRespond(i.Interaction, "no snapshot url provided!")
+				return nil
+			}
+			if _, err := url.ParseRequestURI(snapshotUrl.StringValue()); err != nil {
+				discord2.InteractionRespond(i.Interaction, "invalid snapshot url!")
+				return nil
+			}
+			retrievedSitePo, err := retrieveSitePoByNumericalID(id.IntValue())
+			if err != nil {
+				discord2.InteractionRespond(i.Interaction, err.Error())
+				return nil
+			}
+			if retrievedSitePo.UserID != i.Member.User.ID {
+				discord2.InteractionRespond(i.Interaction, fmt.Sprintf("Sorry, this document belongs to another user."))
+				return nil
+			}
+			retrievedSitePo.SnapshotURL = snapshotUrl.StringValue()
+			_, err = updateSitePo(*retrievedSitePo)
+			if err != nil {
+				discord2.InteractionRespond(i.Interaction, err.Error())
+				return nil
+			}
+			discord2.InteractionRespondEmbed(i.Interaction, &discordgo.MessageEmbed{
+				Title:       "Site url updated",
+				Description: "The following site has been updated",
+				Timestamp:   time.Now().Format(time.RFC3339),
+				Color:       discord2.EmbedColorNormal,
+				Fields: []*discordgo.MessageEmbedField{{
+					Name:   "Temp title",
+					Value:  retrievedSitePo.essentialInfoForEmbed(),
+					Inline: false,
+				}},
+			}, nil)
+		case "upload-snapshot-attachment":
 		}
 	}
 
@@ -161,7 +275,7 @@ func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, b
 	if _, err := url.ParseRequestURI(m.Content); err == nil {
 		//go through active stages to make sure no other in process
 		if _, ok := cm.ActiveSaveSitetageMap[newSaveStageKeyFromMs(*m.Message)]; ok {
-			discord.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
+			discord2.ChannelMessageSend(m.ChannelID, "Found an active stage, please finish that one first.")
 			return false, true
 		}
 		return true, true
@@ -169,7 +283,7 @@ func (cm *SaveThisSiteCommand) MatchMessage(m *discordgo.MessageCreate) (bool, b
 	return false, true
 }
 
-type saveSitestageMap map[CombinedKey]*saveSiteStage
+type saveSitestageMap map[commands.CombinedKey]*saveSiteStage
 
 func (m saveSitestageMap) insertSaveSiteStage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) error {
 	key := newSaveStageKeyFromMs(*ms.Message)
@@ -185,7 +299,7 @@ func (m saveSitestageMap) insertSaveSiteStage(ms *discordgo.MessageCreate, cm *S
 	return nil
 }
 
-func (m saveSitestageMap) disposeSaveSiteStage(key CombinedKey) error {
+func (m saveSitestageMap) disposeSaveSiteStage(key commands.CombinedKey) error {
 	if v, ok := m[key]; !ok {
 		return fmt.Errorf("disposing non-exist sitestage w/ id: %s", key)
 	} else {
@@ -196,17 +310,17 @@ func (m saveSitestageMap) disposeSaveSiteStage(key CombinedKey) error {
 	return nil
 }
 
-func newSaveStageKeyFromRaw(channelID, userID string) CombinedKey {
-	return CombinedKeyFromRaw(channelID, userID)
+func newSaveStageKeyFromRaw(channelID, userID string) commands.CombinedKey {
+	return commands.CombinedKeyFromRaw(channelID, userID)
 }
 
-func newSaveStageKeyFromMs(ms discordgo.Message) CombinedKey {
+func newSaveStageKeyFromMs(ms discordgo.Message) commands.CombinedKey {
 	return newSaveStageKeyFromRaw(ms.ChannelID, ms.Author.ID)
 }
 
 func newSaveSitestage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) saveSiteStage {
 	stage := saveSiteStage{
-		BasicStageInfo: BasicStageInfo{
+		BasicStageInfo: commands.BasicStageInfo{
 			ChannelID:      ms.ChannelID,
 			UserID:         ms.Author.ID,
 			StageNow:       0,
@@ -219,7 +333,7 @@ func newSaveSitestage(ms *discordgo.MessageCreate, cm *SaveThisSiteCommand) save
 }
 
 type saveSiteStage struct {
-	BasicStageInfo
+	commands.BasicStageInfo
 	URL            string
 	ProcessMsgChan chan *discordgo.Message
 	MainCommand    *SaveThisSiteCommand
@@ -233,11 +347,11 @@ func (s *saveSiteStage) process() {
 		"all answers should start with **@%s**, expires in %d seconds"
 	promptEmbed := &discordgo.MessageEmbed{
 		Description: fmt.Sprintf(questionPrompt, s.URL, clients.DgSession.State.User.Username, stageOvertime),
-		Color:       discord.EmbedColorQuestion,
+		Color:       discord2.EmbedColorQuestion,
 	}
 
 	//start the prompt
-	discord.ChannelMessageSendEmbed(s.ChannelID, promptEmbed)
+	discord2.ChannelMessageSendEmbed(s.ChannelID, promptEmbed)
 	var sitePo SitePO
 	func() {
 		for {
@@ -258,25 +372,25 @@ func (s *saveSiteStage) process() {
 						sitePo.Site = s.URL
 						prompt := "[1/2] Add tags for this site, separated by default separator, type \"-\" to leave it blank.\r" +
 							"Current separator:[%s]"
-						discord.ChannelMessageSend(s.ChannelID, fmt.Sprintf(prompt, Separator))
+						discord2.ChannelMessageSend(s.ChannelID, fmt.Sprintf(prompt, commands.Separator))
 						s.StageNow += 1
 					}
 					if content == "n" || content == "no" {
-						discord.ChannelMessageSend(s.ChannelID, "Site saving cancelled.")
+						discord2.ChannelMessageSend(s.ChannelID, "Site saving cancelled.")
 						return
 					}
 				case 1:
-					tags, count := s.MainCommand.SeparateArgs(content, Separator)
+					tags, count := s.MainCommand.SeparateArgs(content, commands.Separator)
 					prompt := "[2/2] Add note for this site,type \"-\" to leave it blank."
 					if count == 0 {
-						discord.ChannelMessageSend(s.ChannelID, "Add at least one tag, or use \"-\" to leave the field blank.")
+						discord2.ChannelMessageSend(s.ChannelID, "Add at least one tag, or use \"-\" to leave the field blank.")
 					} else if count == 1 && tags[0] == "-" {
 						//no tags
-						discord.ChannelMessageSend(s.ChannelID, prompt)
+						discord2.ChannelMessageSend(s.ChannelID, prompt)
 						s.StageNow += 1
 					} else {
 						sitePo.Tags = tags
-						discord.ChannelMessageSend(s.ChannelID, prompt)
+						discord2.ChannelMessageSend(s.ChannelID, prompt)
 						s.StageNow += 1
 					}
 				case 2:
@@ -284,12 +398,12 @@ func (s *saveSiteStage) process() {
 						sitePo.Note = content
 					}
 					//TODO snapshot things
-					persistSitePo(sitePo, true)
-					discord.ChannelMessageSendEmbed(msg.ChannelID, &discordgo.MessageEmbed{
+					insertSitePo(sitePo, true)
+					discord2.ChannelMessageSendEmbed(msg.ChannelID, &discordgo.MessageEmbed{
 						Title:       "Site saved",
 						Description: "The following site has been saved",
 						Timestamp:   time.Now().Format(time.RFC3339),
-						Color:       discord.EmbedColorNormal,
+						Color:       discord2.EmbedColorNormal,
 						Fields: []*discordgo.MessageEmbedField{{
 							Name:   "Temp Title",
 							Value:  sitePo.essentialInfoForEmbed(),
@@ -311,7 +425,7 @@ func (s *saveSiteStage) process() {
 
 func newListSiteStage(ms *discordgo.Message, userID string, cm *SaveThisSiteCommand) listSiteStage {
 	stage := listSiteStage{
-		BasicStageInfo: BasicStageInfo{
+		BasicStageInfo: commands.BasicStageInfo{
 			ChannelID:      ms.ChannelID,
 			UserID:         userID,
 			StageNow:       0,
@@ -325,8 +439,8 @@ func newListSiteStage(ms *discordgo.Message, userID string, cm *SaveThisSiteComm
 }
 
 type listSiteStage struct {
-	BasicStageInfo
-	LsPager                *Pager
+	commands.BasicStageInfo
+	LsPager                *commands.Pager
 	ProcessInteractionChan chan *discordgo.Interaction
 	MainCommand            *SaveThisSiteCommand
 }
@@ -355,13 +469,13 @@ func (l *listSiteStage) process() {
 	l.MainCommand.ActiveListSiteStageMap.disposeListSiteStage(newListStageKeyFromRaw(l.LsPager.AttachedMessage.ID, l.UserID))
 }
 
-func newListStageKeyFromRaw(messageID, userID string) CombinedKey {
-	return CombinedKeyFromRaw(messageID, userID)
+func newListStageKeyFromRaw(messageID, userID string) commands.CombinedKey {
+	return commands.CombinedKeyFromRaw(messageID, userID)
 }
 
-type listSitestageMap map[CombinedKey]*listSiteStage
+type listSitestageMap map[commands.CombinedKey]*listSiteStage
 
-func (m listSitestageMap) insertListSiteStage(userID string, pager Pager, cm *SaveThisSiteCommand) error {
+func (m listSitestageMap) insertListSiteStage(userID string, pager commands.Pager, cm *SaveThisSiteCommand) error {
 	key := newListStageKeyFromRaw(pager.AttachedMessage.ID, userID)
 	//can have multiple active stage
 	if stage, ok := m[key]; ok {
@@ -376,7 +490,7 @@ func (m listSitestageMap) insertListSiteStage(userID string, pager Pager, cm *Sa
 	return nil
 }
 
-func (m listSitestageMap) disposeListSiteStage(key CombinedKey) error {
+func (m listSitestageMap) disposeListSiteStage(key commands.CombinedKey) error {
 	if v, ok := m[key]; !ok {
 		return fmt.Errorf("disposing non-exist ls-site-stage w/ id: %s", key)
 	} else {
@@ -395,7 +509,7 @@ func (cm *SaveThisSiteCommand) New() {
 	cm.RegexExpressions = append(cm.RegexExpressions, regexp.MustCompile(websiteRegex))
 	cm.InitAvailableFlagMap()
 	//the flag for taggiong sites
-	cm.RegisterCommandFlag(CommandFlag{
+	cm.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "tag",
 		FlagPrefix:       []string{"tag", "t"},
 		AcceptsExtraArg:  true,
@@ -403,7 +517,7 @@ func (cm *SaveThisSiteCommand) New() {
 		MEGroup:          nil,
 	})
 	//the flag for debugging flag inputs
-	cm.RegisterCommandFlag(CommandFlag{
+	cm.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "debug",
 		FlagPrefix:       []string{"debug"},
 		AcceptsExtraArg:  false,
@@ -411,7 +525,7 @@ func (cm *SaveThisSiteCommand) New() {
 		MEGroup:          nil,
 	})
 	//the flag for adding notes to sites
-	cm.RegisterCommandFlag(CommandFlag{
+	cm.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "note",
 		FlagPrefix:       []string{"note", "n"},
 		AcceptsExtraArg:  true,
@@ -419,7 +533,7 @@ func (cm *SaveThisSiteCommand) New() {
 		MEGroup:          nil,
 	})
 	//the flag for using next-generation interactions.
-	cm.RegisterCommandFlag(CommandFlag{
+	cm.RegisterCommandFlag(commands.CommandFlag{
 		Name:             "neo",
 		FlagPrefix:       []string{"neo"},
 		AcceptsExtraArg:  false,
@@ -478,18 +592,111 @@ func (cm *SaveThisSiteCommand) New() {
 		},
 	}
 
-	cm.CompActionMap = make(ComponentActionMap)
+	cm.CompActionMap = make(commands.ComponentActionMap)
 	cm.CompActionMap[lsButtonIDPrev] = func(i *discordgo.InteractionCreate) {
 		matchKey := newListStageKeyFromRaw(i.Message.ID, i.Member.User.ID)
 		if listStage, ok := cm.ActiveListSiteStageMap[matchKey]; ok {
-			listStage.LsPager.SwitchPage(PagerPrevPage, i.Interaction)
+			listStage.LsPager.SwitchPage(commands.PagerPrevPage, i.Interaction)
 		}
 	}
 	cm.CompActionMap[lsButtonIDNext] = func(i *discordgo.InteractionCreate) {
 		matchKey := newListStageKeyFromRaw(i.Message.ID, i.Member.User.ID)
 		if listStage, ok := cm.ActiveListSiteStageMap[matchKey]; ok {
-			listStage.LsPager.SwitchPage(PagerNextPage, i.Interaction)
+			listStage.LsPager.SwitchPage(commands.PagerNextPage, i.Interaction)
 		}
+	}
+	//todo: complete the modification
+	cm.AppCommandsMap["modify-site"] = &discordgo.ApplicationCommand{
+		Name:        "modify-site",
+		Description: "Modify site logs saved by dalian",
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Type: discordgo.ApplicationCommandOptionInteger,
+				Name: "id",
+				//late init, replace %s with separator
+				Description: "ID of the modifying site log.",
+				Required:    true,
+			},
+			{
+				Type: discordgo.ApplicationCommandOptionString,
+				Name: "tags",
+				//late init, replace %s with separator
+				Description: "Modify tags for this site, separated by default separator." +
+					" If you want to clear it up, type [-].",
+				Required: false,
+			},
+			{
+				Type: discordgo.ApplicationCommandOptionString,
+				Name: "note",
+				//late init, replace %s with separator
+				Description: "Modify note for this site." +
+					" If you want to clear it up, type [-].",
+				Required: false,
+			},
+		},
+	}
+	cm.AppCommandsMap["update-site-snapshot"] = &discordgo.ApplicationCommand{
+		Name:        "update-site-snapshot",
+		Description: "Update the snapshot for a given site record.",
+
+		Options: []*discordgo.ApplicationCommandOption{
+			{
+				Name:        "refresh-snapshot",
+				Description: "Force refresh the snapshot. Old snapshot (if present) will be discarded.",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type: discordgo.ApplicationCommandOptionInteger,
+						Name: "id",
+						//late init, replace %s with separator
+						Description: "ID of the modifying site log.",
+						Required:    true,
+					},
+				},
+			},
+			{
+				Name:        "update-snapshot-url",
+				Description: "Manually update the url for snapshot. Old snapshot (if present) will be discarded.",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type: discordgo.ApplicationCommandOptionInteger,
+						Name: "id",
+						//late init, replace %s with separator
+						Description: "ID of the modifying site log.",
+						Required:    true,
+					},
+					{
+						Type: discordgo.ApplicationCommandOptionString,
+						Name: "snapshot-url",
+						Description: "Modify the valid share URL for the site snapshot." +
+							" If you want to clear it up, type [-].",
+						Required: true,
+					},
+				},
+			},
+			{
+				Name:        "upload-snapshot-attachment",
+				Description: "Manually update the snapshot attachment to cloud. Old snapshot (if present) will be discarded.",
+				Type:        discordgo.ApplicationCommandOptionSubCommand,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						Type: discordgo.ApplicationCommandOptionInteger,
+						Name: "id",
+						//late init, replace %s with separator
+						Description: "ID of the modifying site log.",
+						Required:    true,
+					},
+					{
+						Type: discordgo.ApplicationCommandOptionString,
+						Name: "snapshot-attachment",
+						Description: "Modify the valid share URL for the site snapshot." +
+							" If you want to clear it up, type [-].",
+						Required: true,
+					},
+				},
+			},
+		},
 	}
 
 }
@@ -498,32 +705,32 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 	//first check manual
 	//one-step insertion, or list / other operations
 	if matchStatus, matchedCommand := cm.MatchText(m.Content); matchStatus {
-		args, length := cm.SeparateArgs(m.Content, Separator)
+		args, length := cm.SeparateArgs(m.Content, commands.Separator)
 		//read the flags
 		flagMap, err := cm.ParseFlags(args[0])
 		if err != nil {
-			discord.ChannelMessageReportError(m.ChannelID, err)
+			discord2.ChannelMessageReportError(m.ChannelID, err)
 			return nil
 		}
 		//validate the flags
 		flagMap, err = cm.ValidateFlagMap(flagMap)
 		if err != nil {
-			discord.ChannelMessageReportError(m.ChannelID, err)
+			discord2.ChannelMessageReportError(m.ChannelID, err)
 			return nil
 		}
 		if flagMap.HasFlag("debug") {
-			discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("flagMap:%v", flagMap))
+			discord2.ChannelMessageSend(m.ChannelID, fmt.Sprintf("flagMap:%v", flagMap))
 		}
 		//execute command body
 		switch matchedCommand {
 		case "save-site":
 			//make sure arg[1] has a valid url
 			if length <= 1 {
-				discord.ChannelMessageSend(m.ChannelID, "You need an url as the second argument!")
+				discord2.ChannelMessageSend(m.ChannelID, "You need an url as the second argument!")
 				return nil
 			}
 			if _, err := url.ParseRequestURI(args[1]); err != nil {
-				discord.ChannelMessageSend(m.ChannelID, "The second argument must be a VALID url!")
+				discord2.ChannelMessageSend(m.ChannelID, "The second argument must be a VALID url!")
 				return nil
 			}
 			//validation passed, start the logic
@@ -539,14 +746,14 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 				sitePO.Note = flagMap["note"][0]
 			}
 			//save it to the database
-			go persistSitePo(sitePO, true)
+			go insertSitePo(sitePO, true)
 			// discord.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Site saved:%s", sitePO.essentialInfo()))
 			//TODO: snapshot things.
-			discord.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
+			discord2.ChannelMessageSendEmbed(m.ChannelID, &discordgo.MessageEmbed{
 				Title:       "Site saved",
 				Description: "The following site has been saved",
 				Timestamp:   time.Now().Format(time.RFC3339),
-				Color:       discord.EmbedColorNormal,
+				Color:       discord2.EmbedColorNormal,
 				Fields: []*discordgo.MessageEmbedField{{
 					Name:   "Temp Title",
 					Value:  sitePO.essentialInfoForEmbed(),
@@ -573,7 +780,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 				return err
 			}
 			// clients.DgSession.ChannelMessageSend(m.ChannelID, fmt.Sprintf("Found Doc(s):%s", results.digestInfo()))
-			_, err = discord.ChannelMessageSendEmbed(m.ChannelID, newListSiteEmbed(results))
+			_, err = discord2.ChannelMessageSendEmbed(m.ChannelID, newListSiteEmbed(results))
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -586,7 +793,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 		//calling insertSaveSiteStage to start a goroutine for stepped Q&A
 		//the stage will auto dispose.
 		if err := cm.ActiveSaveSitetageMap.insertSaveSiteStage(m, cm); err != nil {
-			discord.ChannelMessageReportError(m.ChannelID, err)
+			discord2.ChannelMessageReportError(m.ChannelID, err)
 		}
 		//no subsequent check
 		return nil
@@ -607,7 +814,7 @@ func (cm *SaveThisSiteCommand) DoMessage(m *discordgo.MessageCreate) error {
 
 type SitePO struct {
 	//Display Info
-	ID   int      `bson:"id"`
+	ID   int64    `bson:"id"`
 	Site string   `bson:"site"`
 	Tags []string `bson:"tags"`
 	Note string   `bson:"note"`
@@ -659,7 +866,7 @@ func (sp *SitePO) essentialInfo() string {
 }
 
 func (sp *SitePO) essentialInfoForEmbed() string {
-	var tags, note string
+	var tags, note, optSnapshot string
 	if len(sp.Tags) == 0 {
 		tags = "*None*"
 	} else {
@@ -671,10 +878,14 @@ func (sp *SitePO) essentialInfoForEmbed() string {
 	} else {
 		note = sp.Note
 	}
+	if sp.SnapshotURL != "" {
+		optSnapshot = fmt.Sprintf("\r[snapshot](%s)", sp.SnapshotURL)
+	}
 	essentialInfo := "%s\r" +
 		"Tags: %s\r" +
-		"Note: %s"
-	return fmt.Sprintf(essentialInfo, sp.Site, tags, note)
+		"Note: %s" +
+		"%s"
+	return fmt.Sprintf(essentialInfo, sp.Site, tags, note, optSnapshot)
 }
 
 func newRawSitePOFromMessage(message *discordgo.Message) SitePO {
@@ -701,7 +912,7 @@ func newRawSitePoFromInteraction(i *discordgo.Interaction) SitePO {
 	return sitepo
 }
 
-func getLastNumericalID() int {
+func getLastNumericalID() int64 {
 
 	singleResult := data.GetCollection("site_collection").FindOne(context.TODO(), bson.M{}, options.FindOne().SetSort(bson.M{"id": -1}))
 	if singleResult.Err() == mongo.ErrNoDocuments {
@@ -715,7 +926,7 @@ func getLastNumericalID() int {
 	return doc.ID
 }
 
-func persistSitePo(po SitePO, isCreate bool) error {
+func insertSitePo(po SitePO, isCreate bool) error {
 	idNow := getLastNumericalID() + 1
 	if idNow == 0 {
 		return errors.New("Something wrong retrieving last id")
@@ -728,6 +939,34 @@ func persistSitePo(po SitePO, isCreate bool) error {
 	}
 	//TODO need to get a numerical id first
 	return nil
+}
+
+func retrieveSitePoByNumericalID(id int64) (*SitePO, error) {
+	query := bson.M{"id": id}
+	res := data.GetCollection("site_collection").FindOne(context.Background(), query)
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
+	var foundPo SitePO
+	if err := res.Decode(&foundPo); err != nil {
+		return nil, errors.Wrap(err, "unknown error")
+	}
+	return &foundPo, nil
+}
+
+func updateSitePo(po SitePO) (*SitePO, error) {
+	query := bson.M{"id": po.ID}
+	po.setTime(false)
+	//FindOneAndUpdate return the modified document before the update, not the document AFTER the update
+	res := data.GetCollection("site_collection").FindOneAndUpdate(context.Background(), query, bson.M{"$set": po})
+	if res.Err() != nil {
+		return nil, res.Err()
+	}
+	var updatedPo SitePO
+	if err := res.Decode(&updatedPo); err != nil {
+		return nil, errors.Wrap(err, "unknown error")
+	}
+	return &updatedPo, nil
 }
 
 type sitePoArr []*SitePO
@@ -746,7 +985,7 @@ func newListSiteEmbed(arr sitePoArr) *discordgo.MessageEmbed {
 		Title:       "ls result",
 		Description: fmt.Sprintf("Your query rendered %d results.", len(arr)),
 		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       discord.EmbedColorNormal,
+		Color:       discord2.EmbedColorNormal,
 		Fields:      nil,
 	}
 	var fields []*discordgo.MessageEmbedField
@@ -762,10 +1001,10 @@ type sitePoPagerLoader struct {
 	query          any
 	queryOptions   []*options.FindOptions
 	resultsStorage []*SitePO
-	DefaultPageRenderer
+	commands.DefaultPageRenderer
 }
 
-func (s *sitePoPagerLoader) LoadPager(pager *Pager) error {
+func (s *sitePoPagerLoader) LoadPager(pager *commands.Pager) error {
 	findCursor, err := data.GetCollection("site_collection").Find(s.context, s.query, s.queryOptions...)
 	if err != nil {
 		return errors.Wrap(err, "error querying site_collections")
@@ -774,9 +1013,9 @@ func (s *sitePoPagerLoader) LoadPager(pager *Pager) error {
 		return errors.Wrap(err, "internal Error: wrong cursor type")
 	}
 	for _, v := range s.resultsStorage {
-		var tempVar IPagerPart
+		var tempVar commands.IPagerPart
 		tempVar = v
-		pager.completeItemSlice = append(pager.completeItemSlice, &tempVar)
+		pager.CompleteItemSlice = append(pager.CompleteItemSlice, &tempVar)
 	}
 	return nil
 }
@@ -784,14 +1023,14 @@ func (s *sitePoPagerLoader) LoadPager(pager *Pager) error {
 func init() {
 	var saveThisCommand SaveThisSiteCommand
 	saveThisCommand.New()
-	RegisterCommand(&saveThisCommand)
+	commands.RegisterCommand(&saveThisCommand)
 }
 
 func (cm *SaveThisSiteCommand) LateInit() {
 	//late-init separator in prompt
 	for _, cmdOption := range cm.AppCommandsMap["save-site"].Options {
 		if cmdOption.Name == "tags" || cmdOption.Name == "note" {
-			cmdOption.Description = fmt.Sprintf(cmdOption.Description, Separator)
+			cmdOption.Description = fmt.Sprintf(cmdOption.Description, commands.Separator)
 		}
 	}
 }
