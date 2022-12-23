@@ -44,8 +44,8 @@ type RoomInfo struct {
 	Keyframe           string             `json:"keyframe,omitempty"`
 	LockTill           string             `json:"lock_till,omitempty"`
 	HiddenTill         string             `json:"hidden_till,omitempty"`
-	BroadcastType      string             `json:"broadcast_type,omitempty"`
-	NeedP2P            string             `json:"need_p2p,omitempty"`
+	BroadcastType      int                `json:"broadcast_type,omitempty"`
+	NeedP2P            int                `json:"need_p2p,omitempty"`
 	IsHidden           bool               `json:"is_hidden,omitempty"`
 	IsLocked           bool               `json:"is_locked,omitempty"`
 	IsPortrait         bool               `json:"is_portrait,omitempty"`
@@ -76,6 +76,10 @@ type DownloadedFileInfo struct {
 }
 
 type HookType int
+
+func (h HookType) Value() int {
+	return int(h)
+}
 
 const (
 	HookStartLive HookType = iota

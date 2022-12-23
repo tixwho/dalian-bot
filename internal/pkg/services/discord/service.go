@@ -1,35 +1,38 @@
 package discord
 
 import (
-	"dalian-bot/internal/pkg/clients"
+	"dalian-bot/internal/pkg/core"
+	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"io"
 	"log"
+	"reflect"
+	"sync"
 )
 
 // ChannelMessageSend A wrapper of discordgo ChannelMessageSend function.
-func ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
-	return clients.DgSession.ChannelMessageSend(channelID, content)
+func (s *Service) ChannelMessageSend(channelID, content string) (*discordgo.Message, error) {
+	return s.Session.ChannelMessageSend(channelID, content)
 }
 
 // ChannelMessageSendEmbed A wrapper of discordgo ChannelMessageSendEmbed function.
-func ChannelMessageSendEmbed(channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
-	return clients.DgSession.ChannelMessageSendEmbed(channelID, embed)
+func (s *Service) ChannelMessageSendEmbed(channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
+	return s.Session.ChannelMessageSendEmbed(channelID, embed)
 }
 
 // ChannelMessageReportError Report the error as a plain message to given gild channel.
-func ChannelMessageReportError(channelID string, error error) (*discordgo.Message, error) {
-	return ChannelMessageSend(channelID, error.Error())
+func (s *Service) ChannelMessageReportError(channelID string, error error) (*discordgo.Message, error) {
+	return s.ChannelMessageSend(channelID, error.Error())
 }
 
 // InteractionRespondComplex Basic wrapper for discordgo.InteractionRespond.
-func InteractionRespondComplex(i *discordgo.Interaction, resp *discordgo.InteractionResponse) error {
-	return clients.DgSession.InteractionRespond(i, resp)
+func (s *Service) InteractionRespondComplex(i *discordgo.Interaction, resp *discordgo.InteractionResponse) error {
+	return s.Session.InteractionRespond(i, resp)
 }
 
 // InteractionRespondEmbed Shortcut method for fast reply including a MessageEmbed.
-func InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) error {
-	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+func (s *Service) InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageEmbed, components []discordgo.MessageComponent) error {
+	return s.InteractionRespondComplex(i, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Embeds:     []*discordgo.MessageEmbed{embed},
@@ -39,8 +42,8 @@ func InteractionRespondEmbed(i *discordgo.Interaction, embed *discordgo.MessageE
 }
 
 // InteractionRespond Shortcut method for a simple message reply.
-func InteractionRespond(i *discordgo.Interaction, content string) error {
-	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+func (s *Service) InteractionRespond(i *discordgo.Interaction, content string) error {
+	return s.InteractionRespondComplex(i, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
 			Content: content,
@@ -48,12 +51,12 @@ func InteractionRespond(i *discordgo.Interaction, content string) error {
 	})
 }
 
-func InteractionResponse(i *discordgo.Interaction) (*discordgo.Message, error) {
-	return clients.DgSession.InteractionResponse(i)
+func (s *Service) InteractionResponse(i *discordgo.Interaction) (*discordgo.Message, error) {
+	return s.Session.InteractionResponse(i)
 }
 
-func InteractionResponseEdit(i *discordgo.Interaction, newresp *discordgo.WebhookEdit) error {
-	return InteractionRespondComplex(i, &discordgo.InteractionResponse{
+func (s *Service) InteractionResponseEdit(i *discordgo.Interaction, newresp *discordgo.WebhookEdit) error {
+	return s.InteractionRespondComplex(i, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseUpdateMessage,
 		Data: &discordgo.InteractionResponseData{
 			Content:    *newresp.Content,
@@ -63,7 +66,7 @@ func InteractionResponseEdit(i *discordgo.Interaction, newresp *discordgo.Webhoo
 	})
 }
 
-func InteractionRespondEditFromMessage(i *discordgo.Interaction, msg *discordgo.Message) error {
+func (s *Service) InteractionRespondEditFromMessage(i *discordgo.Interaction, msg *discordgo.Message) error {
 	tempWebhookEdit := &discordgo.WebhookEdit{
 		Content:    &msg.Content,
 		Components: &msg.Components,
@@ -73,17 +76,165 @@ func InteractionRespondEditFromMessage(i *discordgo.Interaction, msg *discordgo.
 		//the same goes AllowedMentions
 		//AllowedMentions: nil ,
 	}
-	return InteractionResponseEdit(i, tempWebhookEdit)
+	return s.InteractionResponseEdit(i, tempWebhookEdit)
 }
 
 // ChannelFileSend send a file to given guild channel.
 // channelID the id of a channel
 // name the display filename to be sent to discord
 // r the io reader containing a valid file struct
-func ChannelFileSend(channelID, name string, r io.Reader) error {
-	if _, err := clients.DgSession.ChannelFileSend(channelID, name, r); err != nil {
+func (s *Service) ChannelFileSend(channelID, name string, r io.Reader) error {
+	if _, err := s.Session.ChannelFileSend(channelID, name, r); err != nil {
 		log.Println("Error sending discord message: ", err)
 		return err
 	}
 	return nil
+}
+
+type appCommands []*discordgo.ApplicationCommand
+
+func (cmds appCommands) delete(cmd *discordgo.ApplicationCommand) appCommands {
+	j := 0
+	for _, val := range cmds {
+		if val.Name != cmd.Name {
+			cmds[j] = val
+		}
+	}
+	return cmds[:j]
+}
+
+type Service struct {
+	ServiceConfig
+	core.TriggerableEmbedUtil
+	Session              *discordgo.Session
+	registeredCommands   appCommands
+	DiscordAccountConfig core.MessengerConfig
+}
+
+func (s *Service) Init(reg *core.ServiceRegistry) error {
+	reg.RegisterService(s)
+	return nil
+}
+
+func (s *Service) Start(wg *sync.WaitGroup) {
+	/* Setup DiscordGo Session */
+	discordSession, err := discordgo.New("Bot " + s.Token)
+	if err != nil {
+		core.Logger.Panicf("error creating Discord session")
+		panic(err)
+	}
+	discordSession.Identify.Intents = discordgo.IntentGuildMessages
+	err = discordSession.Open()
+	if err != nil {
+		core.Logger.Panicf("error opening Discord connection")
+		panic(err)
+	}
+	discordSession.AddHandler(s.messageCreate)
+	discordSession.AddHandler(s.interactionCreate)
+	s.Session = discordSession
+	//Todo: move it to config file
+	s.DiscordAccountConfig = core.MessengerConfig{
+		Prefix:    "$",
+		Separator: "$",
+		BotID:     s.Session.State.User.ID,
+	}
+	core.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
+	wg.Done()
+}
+
+func (s *Service) Stop(wg *sync.WaitGroup) error {
+	s.DisposeAllSlashCommand()
+	core.Logger.Debugf("Service [%s] is successfully closed.", reflect.TypeOf(s))
+	wg.Done()
+	return nil
+}
+
+func (s *Service) Status() error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *Service) Name() string {
+	return "discord"
+}
+
+func (s *Service) messageCreate(ses *discordgo.Session, m *discordgo.MessageCreate) {
+	t := core.Trigger{
+		Type: core.TriggerTypeDiscord,
+		Event: Event{
+			EventType:     EventTypeMessageCreate,
+			MessageCreate: m,
+		},
+	}
+	s.TriggerChan <- t
+}
+
+func (s *Service) interactionCreate(ses *discordgo.Session, i *discordgo.InteractionCreate) {
+	//debugging
+	fmt.Printf("Int: %s:%s:%v \r\n", i.Member.User.Username, i.Data, i.Message)
+	t := core.Trigger{
+		Type: core.TriggerTypeDiscord,
+		Event: Event{
+			EventType:         EventTypeInteractionCreate,
+			InteractionCreate: i,
+		},
+	}
+	s.TriggerChan <- t
+}
+
+func (s *Service) DisposeAllSlashCommand() error {
+	for _, v := range s.registeredCommands {
+		err := s.Session.ApplicationCommandDelete(s.Session.State.User.ID, "", v.ID)
+		if err != nil {
+			log.Panicf("Cannot delete '%v' command: %v", v.Name, err)
+		} else {
+			core.Logger.Debugf("disposed slash command: %s", v.Name)
+		}
+	}
+	return nil
+}
+
+func (s *Service) DisposeSlashCommand(command core.INewPlugin) error {
+	if slash, ok := command.(ISlashCommand); ok {
+		for _, cmd := range slash.GetAppCommandsMap() {
+			s.registeredCommands = s.registeredCommands.delete(cmd)
+			s.Session.ApplicationCommandDelete(s.Session.State.User.ID, "", cmd.ID)
+		}
+	}
+	return nil
+}
+
+func (s *Service) RegisterSlashCommand(plugin core.INewPlugin) error {
+	if slash, ok := plugin.(ISlashCommandNew); ok {
+		for _, cmd := range slash.GetAppCommandsMap() {
+			cmd, err := s.Session.ApplicationCommandCreate(s.Session.State.User.ID, "", cmd)
+			if err != nil {
+				log.Panicf("Cannot register Command %v", err)
+			} else {
+				core.Logger.Debugf("Installed slash command: %s", cmd.Name)
+				s.registeredCommands = append(s.registeredCommands, cmd)
+			}
+		}
+	} else {
+		core.Logger.Errorf("NOT A SLASH CMD")
+	}
+	core.Logger.Debugf("Registered slash command for plugin:%s", plugin.GetName())
+	return nil
+}
+
+func (s *Service) IsGuildMessageFromBotOrSelf(m *discordgo.Message) bool {
+	// Ignore all messages created by the bot itself
+	// This isn't required in this specific example, but it's a good practice.
+	if m.Author.ID == s.DiscordAccountConfig.BotID {
+		return true
+	}
+	// Ignore chain requests from other bots
+	if m.Author.Bot {
+		return true
+	}
+	return false
+}
+
+type ServiceConfig struct {
+	Token string
 }
