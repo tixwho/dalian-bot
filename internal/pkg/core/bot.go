@@ -7,6 +7,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const VERSION = "1.0.0-alpha-1.3"
+
 // Logger Global logger for Bot behaviors.
 var Logger DalianLogger
 
