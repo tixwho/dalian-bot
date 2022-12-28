@@ -4,6 +4,9 @@ Discord bot w/ various housekeeping functions, written in Golang.
 
 In active development. Powered by [disrord.go](https://github.com/bwmarrin/discordgo) framework.
 
+**🚧Warning🚧**: Reconstruction in progress!!! The new entry point is cmd/next.go. The documentation
+below is *outdated* and will be rewritten in the future.
+
 ## Functions 
 
 #### Utilities
