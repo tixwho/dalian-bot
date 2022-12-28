@@ -28,7 +28,7 @@ type Helper struct {
 
 func (h Helper) DiscordPluginHelp(pluginName string) string {
 	var commandsName []string
-	for k, _ := range h.commandsHelp {
+	for k := range h.commandsHelp {
 		commandsName = append(commandsName, k)
 	}
 	sort.Strings(commandsName)
@@ -138,6 +138,7 @@ type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
 
 type IComponentCommand interface {
 	GetCompActionMap() ComponentActionMap
+	IsComponentInteraction(i *discordgo.InteractionCreate) bool
 	DoComponent(i *discordgo.InteractionCreate) error
 }
 
@@ -147,6 +148,13 @@ type ComponentCommand struct {
 
 func (cm *ComponentCommand) GetCompActionMap() ComponentActionMap {
 	return cm.CompActionMap
+}
+
+func (cm *ComponentCommand) IsComponentInteraction(i *discordgo.InteractionCreate) bool {
+	if i.Type == discordgo.InteractionMessageComponent {
+		return true
+	}
+	return false
 }
 
 type IPagerLoader interface {

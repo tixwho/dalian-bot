@@ -1,12 +1,53 @@
 package ddtv
 
 import (
+	"dalian-bot/internal/pkg/services/discord"
+	"fmt"
+	"github.com/bwmarrin/discordgo"
+	"reflect"
 	"time"
 )
 
+func (wh WebHook) DigestEmbed() *discordgo.MessageEmbed {
+	switch wh.Type {
+	case HookSpaceIsInsufficientWarn:
+		return &discordgo.MessageEmbed{
+			Title:       "DDTV Insufficient Disk Storage WARNING",
+			Description: HookSpaceIsInsufficientWarn.MessagePrompt("", 0),
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Color:       discord.EmbedColorDanger,
+		}
+	}
+	embed := &discordgo.MessageEmbed{
+		Title:       "DDTV Webhook Update",
+		Description: wh.Type.MessagePrompt(wh.RoomInfo.Uname, wh.RoomInfo.RoomID),
+		Author: &discordgo.MessageEmbedAuthor{
+			URL:     fmt.Sprintf("https://space.bilibili.com/%d", wh.UserInfo.UID),
+			Name:    fmt.Sprintf("%s [%d]", wh.UserInfo.Name, wh.UserInfo.UID),
+			IconURL: wh.RoomInfo.Face,
+		},
+		Provider: &discordgo.MessageEmbedProvider{
+			URL:  "https://ddtv.pro",
+			Name: "DDTV",
+		},
+		Image: &discordgo.MessageEmbedImage{
+			URL: wh.RoomInfo.CoverFromUser,
+		},
+		Timestamp: time.Now().Format(time.RFC3339),
+		Color:     discord.EmbedColorNormal,
+		URL:       fmt.Sprintf("https://live.bilibili.com/%d", wh.RoomInfo.RoomID),
+		Fields: []*discordgo.MessageEmbedField{{
+			Name:   wh.RoomInfo.Title,
+			Value:  fmt.Sprintf("Code:%d", wh.Type),
+			Inline: false,
+		}},
+	}
+	return embed
+}
+
 type WebHook struct {
 	ID       string    `json:"id,omitempty"`
-	Type     int       `json:"type,omitempty"`
+	Type     HookType  `json:"type,omitempty"`
 	Uid      int64     `json:"uid,omitempty"`
 	HookTime time.Time `json:"hook_time,omitempty"`
 	UserInfo UserInfo  `json:"user_info,omitempty"`
@@ -79,6 +120,39 @@ type HookType int
 
 func (h HookType) Value() int {
 	return int(h)
+}
+
+func (h HookType) MessagePrompt(username string, uid int) string {
+	switch h {
+	case HookStartLive:
+		return fmt.Sprintf("Live channel %s[%d] is online.", username, uid)
+	case HookStopLive:
+		return fmt.Sprintf("Live channel %s[%d] is offline.", username, uid)
+	case HookStartRec:
+		return fmt.Sprintf("DDTV starts recording live channel %s[%d].", username, uid)
+	case HookRecComplete:
+		return fmt.Sprintf("DDTV completes recording live channel %s[%d].", username, uid)
+	case HookCancelRec:
+		return fmt.Sprintf("DDTV cancels recording live channel %s[%d].", username, uid)
+	case HookTranscodingComlete:
+		return fmt.Sprintf("DDTV completes transcoding video for live channel %s[%d].", username, uid)
+	case HookSaveDanmuComplete:
+		return fmt.Sprintf("DDTV completes saving danmu for live channel %s[%d].", username, uid)
+	case HookSaveSCComplete:
+		return fmt.Sprintf("DDTV completes saving superchat for live channel %s[%d].", username, uid)
+	case HookSaveGiftComplete:
+		return fmt.Sprintf("DDTV completes saving gift info for live channel %s[%d].", username, uid)
+	case HookSaveGuardComplete:
+		return fmt.Sprintf("DDTV completes saving guard info for live channel %s[%d].", username, uid)
+	case HookRunShellComplete:
+		return fmt.Sprintf("DDTV completes a shell task for live channel %s[%d].", username, uid)
+	case HookDownloadEndMissionSuccess:
+		return fmt.Sprintf("DDTV completes a download task for live channel %s[%d].", username, uid)
+	case HookSpaceIsInsufficientWarn:
+		return "DDTV detects a low disk storage!!"
+	default:
+		return fmt.Sprintf("Unknown Hook Type: %s", reflect.TypeOf(h))
+	}
 }
 
 const (

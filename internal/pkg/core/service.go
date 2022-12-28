@@ -117,3 +117,7 @@ type TriggerableEmbedUtil struct {
 func (t *TriggerableEmbedUtil) InstallTriggerChan(triggers chan<- Trigger) {
 	t.TriggerChan = triggers
 }
+
+const (
+	LogPromptUnknownTrigger = "received an unknown trigger type %s, check your [AcceptedTriggerTypes] setting!"
+)

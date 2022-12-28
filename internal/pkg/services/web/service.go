@@ -32,7 +32,7 @@ func (s *Service) Init(reg *core.ServiceRegistry) error {
 }
 
 func (s *Service) Start(wg *sync.WaitGroup) {
-	go s.GinEngine.Run()
+	go s.GinEngine.Run(":8740")
 	core.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
 	wg.Done()
 }

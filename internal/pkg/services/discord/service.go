@@ -120,14 +120,12 @@ func (s *Service) Start(wg *sync.WaitGroup) {
 	/* Setup DiscordGo Session */
 	discordSession, err := discordgo.New("Bot " + s.Token)
 	if err != nil {
-		core.Logger.Panicf("error creating Discord session")
-		panic(err)
+		core.Logger.Panicf("error creating Discord session:%v", err)
 	}
 	discordSession.Identify.Intents = discordgo.IntentGuildMessages
 	err = discordSession.Open()
 	if err != nil {
-		core.Logger.Panicf("error opening Discord connection")
-		panic(err)
+		core.Logger.Panicf("error opening Discord connection:%v", err)
 	}
 	discordSession.AddHandler(s.messageCreate)
 	discordSession.AddHandler(s.interactionCreate)

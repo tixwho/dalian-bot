@@ -26,6 +26,7 @@ func (s *Service) Init(reg *core.ServiceRegistry) error {
 		return err
 	}
 	s.WebService = webSrv
+	// todo: load the path from config
 	s.WebService.GinEngine.POST("/ddtv/webhook", s.handleWebhook)
 	return reg.RegisterService(s)
 }
@@ -46,39 +47,6 @@ func (s *Service) Status() error {
 	panic("implement me")
 }
 
-func InitDDTVHook(engine *gin.Engine) error {
-	engine.POST("/ddtv/webhook", handleFunc)
-	return nil
-}
-
-func handleFunc(c *gin.Context) {
-	var hook WebHook
-
-	//debug
-	fmt.Println("hook found")
-	if err := c.BindJSON(&hook); err != nil {
-		fmt.Printf("Error: %v\r\n", err)
-		//failed. malformed.
-		c.AbortWithStatus(http.StatusBadRequest)
-		return
-	}
-	//fmt.Println(hook)
-	fmt.Printf("Hook is: %d\r\n", hook.Type)
-	switch hook.Type {
-	case HookStartRec.Value():
-		//debug
-		fmt.Printf("Started REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
-	case HookRecComplete.Value():
-		fmt.Printf("Completed REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
-	case HookRunShellComplete.Value():
-		fmt.Printf("Completed Shell for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
-	default:
-		fmt.Println("Unknown event type:" + string(hook.Type))
-	}
-	c.Status(http.StatusOK)
-
-}
-
 // WOW, you can attach a struct!
 func (s *Service) handleWebhook(c *gin.Context) {
 	var hook WebHook
@@ -86,7 +54,7 @@ func (s *Service) handleWebhook(c *gin.Context) {
 	//debug
 	fmt.Println("hook found")
 	if err := c.BindJSON(&hook); err != nil {
-		fmt.Printf("Error: %v\r\n", err)
+		core.Logger.Warnf("Error: %v\r\n", err)
 		//failed. malformed.
 		c.AbortWithStatus(http.StatusBadRequest)
 		return
@@ -94,15 +62,15 @@ func (s *Service) handleWebhook(c *gin.Context) {
 	//fmt.Println(hook)
 	fmt.Printf("Hook is: %d\r\n", hook.Type)
 	switch hook.Type {
-	case HookStartRec.Value():
+	case HookStartRec:
 		//debug
-		fmt.Printf("Started REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
-	case HookRecComplete.Value():
-		fmt.Printf("Completed REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
-	case HookRunShellComplete.Value():
-		fmt.Printf("Completed Shell for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
+		core.Logger.Infof("Started REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
+	case HookRecComplete:
+		core.Logger.Infof("Completed REC for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
+	case HookRunShellComplete:
+		core.Logger.Infof("Completed Shell for %s at %s\r\n", hook.UserInfo.Name, hook.HookTime.Format(time.RFC3339))
 	default:
-		fmt.Println("Unknown event type:" + string(hook.Type))
+		core.Logger.Infof(fmt.Sprintf("Unknown event type: %d", hook.Type))
 	}
 	c.Status(http.StatusOK)
 	t := core.Trigger{

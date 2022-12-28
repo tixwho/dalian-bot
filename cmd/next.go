@@ -39,9 +39,9 @@ func main() {
 	webService.Init(dalianBot.ServiceRegistry)
 	ddtvService := ddtv.Service{}
 	ddtvService.Init(dalianBot.ServiceRegistry)
-	dataService := data.Service{ServiceConfig: data.ServiceConfig{URI: cred.MongoURI}}
+	dataService := data.Service{ServiceConfig: data.ServiceConfig{URI: cred.MongoURI.Value}}
 	dataService.Init(dalianBot.ServiceRegistry)
-	discordService := discord.Service{ServiceConfig: discord.ServiceConfig{Token: cred.DiscordToken}}
+	discordService := discord.Service{ServiceConfig: discord.ServiceConfig{Token: cred.DiscordToken.Value}}
 	discordService.Init(dalianBot.ServiceRegistry)
 
 	dalianBot.ServiceRegistry.StartAll()
@@ -49,6 +49,7 @@ func main() {
 	dalianBot.QuickRegisterPlugin(plugins.NewPingPlugin)
 	dalianBot.QuickRegisterPlugin(plugins.NewWhatPlugin)
 	dalianBot.QuickRegisterPlugin(plugins.NewHelpPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewDDTVPlugin)
 
 	dalianBot.Run()
 	//graceful shutdown
