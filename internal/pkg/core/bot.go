@@ -60,6 +60,7 @@ func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) INewPlugin) error
 }
 
 func (b *Bot) GracefulShutDown() {
+	Logger.Infof("Received termination signal...")
 	b.ServiceRegistry.StopAll()
 }
 

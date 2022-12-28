@@ -2,7 +2,7 @@ package core
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 	"os"
 )
 
@@ -13,11 +13,11 @@ type Cred struct {
 }
 
 type DiscordCred struct {
-	DiscordToken string `yaml:"token"`
+	DiscordToken yaml.Node `yaml:"token"`
 }
 
 type MongoCred struct {
-	MongoURI string `yaml:"uri"`
+	MongoURI yaml.Node `yaml:"uri"`
 }
 
 var credInternal Cred
