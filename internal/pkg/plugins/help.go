@@ -92,7 +92,6 @@ func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
 			},
 		},
 	})
-	p.DiscordService.RegisterSlashCommand(p)
 
 	formattedHelpHelp := fmt.Sprintf(
 		`*Call*: /help,%shelp
@@ -109,7 +108,7 @@ If command-name not provided, list the names of all available commands; Otherwis
 			},
 		},
 	})
-	return nil
+	return p.DiscordService.RegisterSlashCommand(p)
 }
 
 func (p *HelpPlugin) Trigger(trigger core.Trigger) {

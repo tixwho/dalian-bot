@@ -53,7 +53,6 @@ func (p *PingPlugin) Init(reg *core.ServiceRegistry) error {
 		Name:        "ping",
 		Description: "Ping command for Dalian",
 	})
-	p.DiscordService.RegisterSlashCommand(p)
 
 	formattedPingHelp := fmt.Sprintf("*Call*: /ping,%sping\rrespond a \"pong\"", p.DiscordService.DiscordAccountConfig.Prefix)
 	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
@@ -66,7 +65,7 @@ func (p *PingPlugin) Init(reg *core.ServiceRegistry) error {
 		},
 	})
 
-	return nil
+	return p.DiscordService.RegisterSlashCommand(p)
 }
 
 func (p *PingPlugin) Trigger(trigger core.Trigger) {
