@@ -54,6 +54,8 @@ func (s *Service) GetCollection(name string, opts ...*options.CollectionOptions)
 	return s.Client.Database("dalian").Collection(name, opts...)
 }
 
+// Find The multipurpose wrapper for collection.Find function.
+// With power comes responsibility, check the result yourself, including length, error, etc.
 func (s *Service) Find(receiver any, collection *mongo.Collection, ctx context.Context, filter any, options ...*options.FindOptions) error {
 	if reflect.TypeOf(receiver).Kind() != reflect.Ptr {
 		return errors.New("receiver is not a pointer")
@@ -71,29 +73,42 @@ func (s *Service) Find(receiver any, collection *mongo.Collection, ctx context.C
 }
 
 func (s *Service) FindOne(receiver any, collection *mongo.Collection, ctx context.Context, filter any,
-	options ...*options.FindOneOptions) error {
+	options ...*options.FindOneOptions) Result {
 	if reflect.TypeOf(receiver).Kind() != reflect.Ptr {
-		return errors.New("receiver is not a pointer")
+		return NewErrorResult(errors.New("receiver is not a pointer"))
 	}
 	findOneResult := collection.FindOne(ctx, filter, options...)
 	if findOneResult.Err() != nil {
 		// can be mongo.ErrNoDocuments or other type of error
-		return findOneResult.Err()
+		return NewErrorResult(findOneResult.Err())
 	}
 	if err := findOneResult.Decode(receiver); err != nil {
 		core.Logger.Warnf("Database unmarshal error: %v", err)
-		return err
+		return NewErrorResult(err)
 	}
-	return nil
+	return NewSuccessResult(findOneResult)
 
 }
 
-func (s *Service) InsertOne(subject any, collection *mongo.Collection, ctx context.Context, options ...*options.InsertOneOptions) error {
-	_, err := collection.InsertOne(ctx, subject, options...)
+func (s *Service) InsertOne(subject any, collection *mongo.Collection, ctx context.Context,
+	options ...*options.InsertOneOptions) Result {
+	insertOneResult, err := collection.InsertOne(ctx, subject, options...)
 	if err != nil {
-		return err
+		return NewErrorResult(err)
 	}
-	return nil
+	return NewSuccessResult(insertOneResult)
+}
+
+// UpdateOne wrapper of UpdateOne function.
+// Can be used for Upsert by passing options
+func (s *Service) UpdateOne(subject any, collection *mongo.Collection, ctx context.Context,
+	filter any, options ...*options.UpdateOptions) Result {
+	updateResult, err := collection.UpdateOne(ctx, filter, subject, options...)
+	if err != nil {
+		core.Logger.Warnf("Database update error: %v", err)
+		return NewErrorResult(err)
+	}
+	return NewSuccessResult(updateResult)
 }
 
 type ServiceConfig struct {
