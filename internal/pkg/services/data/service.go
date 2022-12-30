@@ -111,6 +111,16 @@ func (s *Service) UpdateOne(subject any, collection *mongo.Collection, ctx conte
 	return NewSuccessResult(updateResult)
 }
 
+func (s *Service) DeleteOne(collection *mongo.Collection, ctx context.Context, filter any,
+	options ...*options.DeleteOptions) Result {
+	deleteResult, err := collection.DeleteOne(ctx, filter, options...)
+	if err != nil {
+		core.Logger.Warnf("Database delete error: %v", err)
+		return NewErrorResult(err)
+	}
+	return NewSuccessResult(deleteResult)
+}
+
 type ServiceConfig struct {
 	URI string
 }

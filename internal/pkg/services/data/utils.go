@@ -16,15 +16,31 @@ func (r Result) Err() error {
 }
 
 func (r Result) SingleResult() *mongo.SingleResult {
+	if r.result == nil {
+		return nil
+	}
 	return r.result.(*mongo.SingleResult)
 }
 
 func (r Result) InsertOneResult() *mongo.InsertOneResult {
+	if r.result == nil {
+		return nil
+	}
 	return r.result.(*mongo.InsertOneResult)
 }
 
 func (r Result) UpdateResult() *mongo.UpdateResult {
+	if r.result == nil {
+		return nil
+	}
 	return r.result.(*mongo.UpdateResult)
+}
+
+func (r Result) DeleteResult() *mongo.DeleteResult {
+	if r.result == nil {
+		return nil
+	}
+	return r.result.(*mongo.DeleteResult)
 }
 
 func NewErrorResult(err error) Result {

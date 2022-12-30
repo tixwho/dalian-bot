@@ -23,7 +23,7 @@ type DDTVPlugin struct {
 	discord.IDisrocdHelper
 }
 
-func (p *DDTVPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (e error) {
+func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (e error) {
 	if isMatched, cmdName := p.DefaultMatchCommand(i); !isMatched {
 		fmt.Printf("nothing matched: %v", i)
 		return nil
@@ -42,16 +42,25 @@ func (p *DDTVPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCre
 						NotifyChannelID:    i.Interaction.ChannelID,
 					})
 					if err != nil {
-						core.Logger.Warnf("Error inserting notification channel record: %v", err)
+						core.Logger.Warnf("Error inserting webhook channel record: %v", err)
 						return err
 					}
 					if updateResult.UpsertedCount > 0 {
-						p.DiscordService.InteractionRespond(i.Interaction, "notification channel created!")
+						p.DiscordService.InteractionRespond(i.Interaction, "webhook channel created!")
 					} else {
-						p.DiscordService.InteractionRespond(i.Interaction, "already a notification channel!")
+						p.DiscordService.InteractionRespond(i.Interaction, "already a webhook channel!")
 					}
 				case "remove":
-					// todo: add remove.
+					deleteResult, err := p.deleteOneWebhookNotifyChannel(i.Interaction.ChannelID)
+					if err != nil {
+						core.Logger.Warnf("Error deleting webhook channel record: %v", err)
+						return err
+					}
+					if deleteResult.DeletedCount > 0 {
+						p.DiscordService.InteractionRespond(i.Interaction, "webhook channel removed!")
+					} else {
+						p.DiscordService.InteractionRespond(i.Interaction, "not a webhook channel yet!")
+					}
 				}
 			}
 		}
@@ -165,7 +174,6 @@ func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv.WebHook) {
 			core.Logger.Warnf("Embed sent failed: %v", err)
 			return
 		}
-		core.Logger.Debugf("Webhook Info Sent to Channel [%s]", channelID) // todo: remove.
 	}
 
 }
@@ -183,10 +191,12 @@ func (p *DDTVPlugin) getCollection() *mongo.Collection {
 
 func (p *DDTVPlugin) upsertOneWebhookNotifyChannel(po ddtvNotifyPo) (*mongo.UpdateResult, error) {
 	rawResult := p.DataService.UpdateOne(bson.D{{"$set", data.ToBsonDocForce(po)}}, p.getCollection(), context.Background(), bson.M{"notify_channel_id": po.NotifyChannelID}, options.Update().SetUpsert(true))
-	if rawResult.Err() != nil {
-		return nil, rawResult.Err()
-	}
 	return rawResult.UpdateResult(), rawResult.Err()
+}
+
+func (p *DDTVPlugin) deleteOneWebhookNotifyChannel(channelID string) (*mongo.DeleteResult, error) {
+	rawResult := p.DataService.DeleteOne(p.getCollection(), context.Background(), bson.M{"notify_channel_id": channelID})
+	return rawResult.DeleteResult(), rawResult.Err()
 }
 
 func (p *DDTVPlugin) findDDTVWebhookNotifyChannels() (channels []string, er error) {
