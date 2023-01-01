@@ -8,15 +8,18 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// HelpPlugin Plugin for collecting help info of registered commands.
+// For Discord: can be triggered by $help or /help
 type HelpPlugin struct {
-	core.Plugin
-	DiscordService *discord.Service
-	core.StartWithMatchUtil
-	core.ArgParseUtil
-	discord.SlashCommand
-	discord.IDisrocdHelper
+	core.Plugin                              // basic plugin basetype
+	DiscordService          *discord.Service // currently support discord
+	core.StartWithMatchUtil                  // plain message support
+	core.ArgParseUtil                        // command argument support
+	discord.SlashCommand                     // discord slash command support
+	discord.IDisrocdHelper                   // the plugin itself needs to display help texts.
 }
 
+// DoNamedInteraction `/help [command-name]` support
 func (p *HelpPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (err error) {
 	if match, name := p.DefaultMatchCommand(i); match {
 		switch name {
@@ -32,6 +35,7 @@ func (p *HelpPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCre
 	return nil
 }
 
+// parseHelpText browse through all plugins registered with bot and match help texts available.
 func parseHelpText(b *core.Bot, commandName string) string {
 	helpText := ""
 	if commandName == "" {
@@ -58,6 +62,7 @@ func parseHelpText(b *core.Bot, commandName string) string {
 	return helpText
 }
 
+// DoMessage `$help [command-name]` support
 func (p *HelpPlugin) DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err error) {
 	if matched, _ := p.StartWithMatchUtil.MatchText(m.Content, p.DiscordService.DiscordAccountConfig); matched {
 		args := p.ArgParseUtil.SeparateArgs(m.Content, p.DiscordService.DiscordAccountConfig.Separator)
@@ -93,6 +98,7 @@ func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
 		},
 	})
 
+	// Help text for HelpPlugin itself.
 	formattedHelpHelp := fmt.Sprintf(
 		`*Call*: /help,%shelp
 *Optional Argument*: [command-name]
