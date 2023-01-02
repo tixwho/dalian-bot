@@ -13,9 +13,25 @@ func (wh WebHook) DigestEmbed() *discordgo.MessageEmbed {
 	case HookSpaceIsInsufficientWarn:
 		return &discordgo.MessageEmbed{
 			Title:       "DDTV Insufficient Disk Storage WARNING",
-			Description: HookSpaceIsInsufficientWarn.MessagePrompt("", 0),
+			Description: wh.Type.MessagePrompt("", 0),
 			Timestamp:   time.Now().Format(time.RFC3339),
 			Color:       discord.EmbedColorDanger,
+		}
+	case HookLoginFailure:
+		fallthrough
+	case HookLoginWillExpireSoon:
+		return &discordgo.MessageEmbed{
+			Title:       "DDTV Login Status WARNING",
+			Description: wh.Type.MessagePrompt("", 0),
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Color:       discord.EmbedColorDanger,
+		}
+	case HookUpdateAvailable:
+		return &discordgo.MessageEmbed{
+			Title:       "DDTV Update available",
+			Description: wh.Type.MessagePrompt("", 0),
+			Timestamp:   time.Now().Format(time.RFC3339),
+			Color:       discord.EmbedColorQuestion,
 		}
 	}
 	embed := &discordgo.MessageEmbed{
@@ -150,6 +166,12 @@ func (h HookType) MessagePrompt(username string, uid int) string {
 		return fmt.Sprintf("DDTV completes a download task for live channel %s[%d].", username, uid)
 	case HookSpaceIsInsufficientWarn:
 		return "DDTV detects a low disk storage!!"
+	case HookLoginFailure:
+		return "DDTV login failed!!"
+	case HookLoginWillExpireSoon:
+		return "DDTV login will expire soon!!"
+	case HookUpdateAvailable:
+		return "A new version of DDTV is available. Please update asap."
 	default:
 		return fmt.Sprintf("Unknown Hook Type: %s", reflect.TypeOf(h))
 	}
@@ -169,4 +191,7 @@ const (
 	HookRunShellComplete
 	HookDownloadEndMissionSuccess
 	HookSpaceIsInsufficientWarn
+	HookLoginFailure
+	HookLoginWillExpireSoon
+	HookUpdateAvailable
 )
