@@ -126,8 +126,8 @@ type BotCallingCommand struct {
 }
 
 // IsCallingBot Return true if the text starts with @{BotID}
-func (b BotCallingCommand) IsCallingBot(content string) (isCalling bool, sanitizedContent string) {
-	callingStr := fmt.Sprintf("<@%s>", core.BotID)
+func (b BotCallingCommand) IsCallingBot(content string, config core.MessengerConfig) (isCalling bool, sanitizedContent string) {
+	callingStr := fmt.Sprintf("<@%s>", config.BotID)
 	if strings.HasPrefix(content, callingStr) {
 		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
 	}
@@ -139,7 +139,7 @@ type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
 type IComponentCommand interface {
 	GetCompActionMap() ComponentActionMap
 	IsComponentInteraction(i *discordgo.InteractionCreate) bool
-	DoComponent(i *discordgo.InteractionCreate) error
+	DoComponentInteraction(b *core.Bot, i *discordgo.InteractionCreate) error
 }
 
 type ComponentCommand struct {

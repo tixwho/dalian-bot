@@ -50,6 +50,7 @@ func main() {
 	dalianBot.QuickRegisterPlugin(plugins.NewWhatPlugin)
 	dalianBot.QuickRegisterPlugin(plugins.NewHelpPlugin)
 	dalianBot.QuickRegisterPlugin(plugins.NewDDTVPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewArchivePlugin)
 
 	dalianBot.Run()
 	//graceful shutdown

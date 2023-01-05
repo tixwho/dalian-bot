@@ -22,6 +22,7 @@ type ArchivePlugin struct {
 	discord.SlashCommand
 	discord.IDisrocdHelper
 	core.ArgParseUtil
+	core.StageUtil
 }
 
 func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption) error {
@@ -39,7 +40,7 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 	aPo.Site = optionsMap["url"].StringValue()
 	// set tags
 	if tagsOption, ok := optionsMap["tags"]; ok {
-		ephemeralTags := p.SeparateArgs(tagsOption.StringValue(), core.Separator)
+		ephemeralTags := p.SeparateArgs(tagsOption.StringValue(), p.DiscordService.DiscordAccountConfig.Separator)
 		aPo.Tags = ephemeralTags
 	}
 	if tagsOption, ok := optionsMap["note"]; ok {
@@ -47,11 +48,11 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 	}
 	// set time
 	aPo.setTime(true)
-	_, err := p.insertOneArchivePo(aPo)
-	if err != nil {
-		core.Logger.Warnf("Error inserting archive document: %v", err)
+	result := p.insertOneArchivePo(aPo)
+	if result.Err() != nil {
+		core.Logger.Warnf("Error inserting archive document: %v", result.Err())
 		p.DiscordService.InteractionRespond(i, "Internal error inserting! Please contact admin for help.")
-		return err
+		return result.Err()
 	}
 	p.DiscordService.InteractionRespondEmbed(i, &discordgo.MessageEmbed{
 		Title:       "Site saved",
@@ -87,6 +88,7 @@ func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.Interaction
 }
 
 func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
+	// services
 	//discordService is a MUST have. return error if not found.
 	if err := reg.FetchService(&p.DiscordService); err != nil {
 		return err
@@ -95,10 +97,16 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 	if err := reg.FetchService(&p.DataService); err != nil {
 		return err
 	}
+	// core plugin type
 	p.Plugin = core.Plugin{
 		Name:                 "archive",
 		AcceptedTriggerTypes: []core.TriggerType{core.TriggerTypeDiscord},
 	}
+	// utils
+	p.ArgParseUtil = core.ArgParseUtil{}
+	p.StageUtil = core.NewStageUtil()
+
+	// discord
 	p.SlashCommand = discord.SlashCommand{AppCommandsMap: map[string]*discordgo.ApplicationCommand{}}
 	p.AppCommandsMap.RegisterCommand(&discordgo.ApplicationCommand{
 		Name:        "archive",
@@ -153,6 +161,7 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 		},
 	})
 
+	// discord helps
 	formattedHelpSiteSet := `*archive site save*: /archive site save
 Save the given website to dalian database. You will have the option to save a snapshot of it.`
 	formattedHelpSiteList := `*archive site list*: /archive site list
@@ -276,9 +285,14 @@ func (p *ArchivePlugin) getCollection() *mongo.Collection {
 	return p.DataService.GetCollection("site_collection")
 }
 
-func (p *ArchivePlugin) insertOneArchivePo(po archivePO) (*mongo.InsertOneResult, error) {
-	rawResult := p.DataService.InsertOne(po, p.getCollection(), context.Background())
-	return rawResult.InsertOneResult(), rawResult.Err()
+func (p *ArchivePlugin) insertOneArchivePo(po archivePO) data.Result {
+	return p.DataService.InsertOne(po, p.getCollection(), context.Background())
+}
+
+func (p *ArchivePlugin) findArchivePo(query any) ([]*archivePO, error) {
+	var results []*archivePO
+	err := p.DataService.Find(results, p.getCollection(), context.Background(), query)
+	return results, err
 }
 
 func NewArchivePlugin(reg *core.ServiceRegistry) core.INewPlugin {

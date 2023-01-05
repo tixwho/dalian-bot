@@ -8,6 +8,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+// PingPlugin Basic ping support.
+// Discord: can be trigggered by $ping, /ping
 type PingPlugin struct {
 	core.Plugin
 	DiscordService *discord.Service
