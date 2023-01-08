@@ -7,15 +7,18 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-)
-
-const (
-	clientId = "b730a7df-d993-4536-bc13-b5d5e5430bbc"
-	secret   = "5UY8Q~3bUT8nQmhPokBfksQ0GtodToS4RDzqhaed"
+	"os"
 )
 
 var accessToken string
 var onedriveClient *onedrive.Client
+var clientId string
+var secret string
+
+func Init() {
+	clientId = os.Getenv("CLIENT_ID")
+	secret = os.Getenv("SECRET")
+}
 
 func Login() error {
 	// Initializing the client credential

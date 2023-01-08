@@ -7,9 +7,10 @@ import (
 )
 
 type Cred struct {
-	Version     string `yaml:"version"`
-	DiscordCred `yaml:"discord-cred"`
-	MongoCred   `yaml:"mongo-cred"`
+	Version      string `yaml:"version"`
+	DiscordCred  `yaml:"discord-cred"`
+	MongoCred    `yaml:"mongo-cred"`
+	OnedriveCred `yaml:"onedrive-cred"`
 }
 
 type DiscordCred struct {
@@ -18,6 +19,11 @@ type DiscordCred struct {
 
 type MongoCred struct {
 	MongoURI yaml.Node `yaml:"uri"`
+}
+
+type OnedriveCred struct {
+	OnedriveClientID yaml.Node `yaml:"client-id"`
+	OnedriveSecret   yaml.Node `yaml:"secret"`
 }
 
 var credInternal Cred

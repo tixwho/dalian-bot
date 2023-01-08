@@ -17,8 +17,6 @@
 # sensitive credentials that should not be exposed
 config/credentials.yaml
 
-# testing features
-internal/pkg/testing/
 
 # idea settings
 .idea/

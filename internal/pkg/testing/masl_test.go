@@ -22,6 +22,7 @@ func setup() {
 	fmt.Println("Before all tests")
 	http.HandleFunc("/myapp/", recordAuthCode)
 	go http.ListenAndServe(":80", nil)
+	Init()
 }
 
 // post-test teardown
