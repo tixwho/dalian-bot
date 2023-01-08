@@ -1,12 +1,12 @@
 package main
 
 import (
-	"dalian-bot/internal/pkg/core"
-	"dalian-bot/internal/pkg/plugins"
-	"dalian-bot/internal/pkg/services/data"
-	"dalian-bot/internal/pkg/services/ddtv"
-	"dalian-bot/internal/pkg/services/discord"
-	"dalian-bot/internal/pkg/services/web"
+	core2 "dalian-bot/internal/core"
+	plugins2 "dalian-bot/internal/plugins"
+	"dalian-bot/internal/services/data"
+	"dalian-bot/internal/services/ddtv"
+	"dalian-bot/internal/services/discord"
+	"dalian-bot/internal/services/web"
 	"go.uber.org/zap"
 	"os"
 	"os/signal"
@@ -16,8 +16,8 @@ import (
 func main() {
 
 	logger, _ := zap.NewDevelopment()
-	core.Logger = core.DalianLogger{SugaredLogger: logger.Sugar()}
-	core.Logger.Infof("Dalian core logger initialized!")
+	core2.Logger = core2.DalianLogger{SugaredLogger: logger.Sugar()}
+	core2.Logger.Infof("Dalian core logger initialized!")
 
 	/* Read Config files */
 	/*
@@ -28,12 +28,12 @@ func main() {
 		}
 
 	*/
-	cred, err := core.GetCredNew("config/credentials.yaml")
+	cred, err := core2.GetCredNew("config/credentials.yaml")
 	if err != nil {
 		panic("credential test failed")
 	}
 
-	dalianBot := core.NewBot()
+	dalianBot := core2.NewBot()
 
 	webService := web.Service{ServiceConfig: web.ServiceConfig{TrustedProxies: []string{"165.232.129.202"}}}
 	webService.Init(dalianBot.ServiceRegistry)
@@ -46,11 +46,11 @@ func main() {
 
 	dalianBot.ServiceRegistry.StartAll()
 
-	dalianBot.QuickRegisterPlugin(plugins.NewPingPlugin)
-	dalianBot.QuickRegisterPlugin(plugins.NewWhatPlugin)
-	dalianBot.QuickRegisterPlugin(plugins.NewHelpPlugin)
-	dalianBot.QuickRegisterPlugin(plugins.NewDDTVPlugin)
-	dalianBot.QuickRegisterPlugin(plugins.NewArchivePlugin)
+	dalianBot.QuickRegisterPlugin(plugins2.NewPingPlugin)
+	dalianBot.QuickRegisterPlugin(plugins2.NewWhatPlugin)
+	dalianBot.QuickRegisterPlugin(plugins2.NewHelpPlugin)
+	dalianBot.QuickRegisterPlugin(plugins2.NewDDTVPlugin)
+	dalianBot.QuickRegisterPlugin(plugins2.NewArchivePlugin)
 
 	dalianBot.Run()
 	//graceful shutdown

@@ -1,7 +1,7 @@
 package discord
 
 import (
-	"dalian-bot/internal/pkg/core"
+	"dalian-bot/internal/core"
 	"github.com/bwmarrin/discordgo"
 )
 

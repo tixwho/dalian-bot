@@ -1,7 +1,7 @@
 package ddtv
 
 import (
-	"dalian-bot/internal/pkg/services/discord"
+	"dalian-bot/internal/services/discord"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
 	"reflect"

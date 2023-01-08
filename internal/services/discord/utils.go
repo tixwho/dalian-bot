@@ -1,7 +1,7 @@
 package discord
 
 import (
-	"dalian-bot/internal/pkg/core"
+	core2 "dalian-bot/internal/core"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -70,7 +70,7 @@ type ITextCommand interface {
 }
 
 type ITextCommandNew interface {
-	DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err error)
+	DoMessage(b *core2.Bot, m *discordgo.MessageCreate) (err error)
 }
 
 type AppCommandsMap map[string]*discordgo.ApplicationCommand
@@ -86,7 +86,7 @@ type ISlashCommand interface {
 }
 
 type ISlashCommandNew interface {
-	DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (err error)
+	DoNamedInteraction(b *core2.Bot, i *discordgo.InteractionCreate) (err error)
 	GetAppCommandsMap() AppCommandsMap
 }
 
@@ -126,7 +126,7 @@ type BotCallingCommand struct {
 }
 
 // IsCallingBot Return true if the text starts with @{BotID}
-func (b BotCallingCommand) IsCallingBot(content string, config core.MessengerConfig) (isCalling bool, sanitizedContent string) {
+func (b BotCallingCommand) IsCallingBot(content string, config core2.MessengerConfig) (isCalling bool, sanitizedContent string) {
 	callingStr := fmt.Sprintf("<@%s>", config.BotID)
 	if strings.HasPrefix(content, callingStr) {
 		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
@@ -139,7 +139,7 @@ type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
 type IComponentCommand interface {
 	GetCompActionMap() ComponentActionMap
 	IsComponentInteraction(i *discordgo.InteractionCreate) bool
-	DoComponentInteraction(b *core.Bot, i *discordgo.InteractionCreate) error
+	DoComponentInteraction(b *core2.Bot, i *discordgo.InteractionCreate) error
 }
 
 type ComponentCommand struct {
@@ -246,16 +246,16 @@ func (bp *Pager) Setup(trigger any, service *Service) error {
 
 // SwitchPage switch the page for a given pager.
 // no verification process involved
-func (bp *Pager) SwitchPage(a core.PagerAction, i *discordgo.Interaction) error {
+func (bp *Pager) SwitchPage(a core2.PagerAction, i *discordgo.Interaction) error {
 	//render page
 	switch a {
-	case core.PagerPrevPage:
+	case core2.PagerPrevPage:
 		newEmbed, err := bp.RenderPage(bp, bp.PageNow-1, bp.Limit, *bp.EmbedFrame)
 		if err != nil {
 			return err
 		}
 		bp.AttachedMessage.Embeds[0] = newEmbed
-	case core.PagerNextPage:
+	case core2.PagerNextPage:
 		newEmbed, err := bp.RenderPage(bp, bp.PageNow+1, bp.Limit, *bp.EmbedFrame)
 		if err != nil {
 			return err

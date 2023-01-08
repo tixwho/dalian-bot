@@ -1,7 +1,7 @@
 package data
 
 import (
-	"dalian-bot/internal/pkg/core"
+	"dalian-bot/internal/core"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )

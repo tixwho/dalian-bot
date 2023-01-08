@@ -1,8 +1,8 @@
 package plugins
 
 import (
-	"dalian-bot/internal/pkg/core"
-	"dalian-bot/internal/pkg/services/discord"
+	core2 "dalian-bot/internal/core"
+	discord2 "dalian-bot/internal/services/discord"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -11,16 +11,16 @@ import (
 // HelpPlugin Plugin for collecting help info of registered commands.
 // For Discord: can be triggered by $help or /help
 type HelpPlugin struct {
-	core.Plugin                              // basic plugin basetype
-	DiscordService          *discord.Service // currently support discord
-	core.StartWithMatchUtil                  // plain message support
-	core.ArgParseUtil                        // command argument support
-	discord.SlashCommand                     // discord slash command support
-	discord.IDisrocdHelper                   // the plugin itself needs to display help texts.
+	core2.Plugin                               // basic plugin basetype
+	DiscordService           *discord2.Service // currently support discord
+	core2.StartWithMatchUtil                   // plain message support
+	core2.ArgParseUtil                         // command argument support
+	discord2.SlashCommand                      // discord slash command support
+	discord2.IDisrocdHelper                    // the plugin itself needs to display help texts.
 }
 
 // DoNamedInteraction `/help [command-name]` support
-func (p *HelpPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (err error) {
+func (p *HelpPlugin) DoNamedInteraction(b *core2.Bot, i *discordgo.InteractionCreate) (err error) {
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		if match, name := p.DefaultMatchCommand(i); match {
@@ -40,13 +40,13 @@ func (p *HelpPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCre
 }
 
 // parseHelpText browse through all plugins registered with bot and match help texts available.
-func parseHelpText(b *core.Bot, commandName string) string {
+func parseHelpText(b *core2.Bot, commandName string) string {
 	helpText := ""
 	if commandName == "" {
 		helpText += "**Available Commands**"
 	}
 	for _, plugin := range b.PluginRegistry.GetPlugins() {
-		if helpPlugin, ok := plugin.(discord.IDisrocdHelper); ok {
+		if helpPlugin, ok := plugin.(discord2.IDisrocdHelper); ok {
 			if commandName == "" {
 				//general help
 				helpText += "\r" + helpPlugin.DiscordPluginHelp(plugin.GetName())
@@ -67,7 +67,7 @@ func parseHelpText(b *core.Bot, commandName string) string {
 }
 
 // DoMessage `$help [command-name]` support
-func (p *HelpPlugin) DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err error) {
+func (p *HelpPlugin) DoMessage(b *core2.Bot, m *discordgo.MessageCreate) (err error) {
 	if matched, _ := p.StartWithMatchUtil.MatchText(m.Content, p.DiscordService.DiscordAccountConfig); matched {
 		args := p.ArgParseUtil.SeparateArgs(m.Content, p.DiscordService.DiscordAccountConfig.Separator)
 		if len(args) == 1 {
@@ -79,12 +79,12 @@ func (p *HelpPlugin) DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err err
 	return nil
 }
 
-func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
+func (p *HelpPlugin) Init(reg *core2.ServiceRegistry) error {
 	//discordService is a MUST have. return error if not found.
 	if err := reg.FetchService(&p.DiscordService); err != nil {
 		return err
 	}
-	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord}
+	p.AcceptedTriggerTypes = []core2.TriggerType{core2.TriggerTypeDiscord}
 	p.Name = "help"
 	p.Identifiers = []string{"help"}
 	p.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
@@ -109,9 +109,9 @@ func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
 Display the help message.
 If command-name not provided, list the names of all available commands; Otherwise, provide detailed explaination of the specific command.`,
 		p.DiscordService.DiscordAccountConfig.Prefix)
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDisrocdHelper = discord2.GenerateHelper(discord2.HelperConfig{
 		PluginHelp: "Helper support for Dalian.",
-		CommandHelps: []discord.CommandHelp{
+		CommandHelps: []discord2.CommandHelp{
 			{
 				Name:          "help",
 				FormattedHelp: formattedHelpHelp,
@@ -121,28 +121,28 @@ If command-name not provided, list the names of all available commands; Otherwis
 	return p.DiscordService.RegisterSlashCommand(p)
 }
 
-func (p *HelpPlugin) Trigger(trigger core.Trigger) {
+func (p *HelpPlugin) Trigger(trigger core2.Trigger) {
 	if !p.AcceptTrigger(trigger.Type) {
 		return
 	}
-	discordEvent := discord.UnboxEvent(trigger)
+	discordEvent := discord2.UnboxEvent(trigger)
 	switch discordEvent.EventType {
-	case discord.EventTypeMessageCreate:
+	case discord2.EventTypeMessageCreate:
 		if p.DiscordService.IsGuildMessageFromBotOrSelf(discordEvent.MessageCreate.Message) {
 			return
 		}
 		p.DoMessage(trigger.Bot, discordEvent.MessageCreate)
-	case discord.EventTypeInteractionCreate:
+	case discord2.EventTypeInteractionCreate:
 		p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate)
 	default:
-		core.Logger.Warnf("This should NOT reach!")
+		core2.Logger.Warnf("This should NOT reach!")
 	}
 }
 
-func NewHelpPlugin(reg *core.ServiceRegistry) core.INewPlugin {
+func NewHelpPlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
 	var help HelpPlugin
-	if err := (&help).Init(reg); err != nil && errors.As(err, &core.ErrServiceFetchUnknownService) {
-		core.Logger.Panicf("Help plugin MUST have all required service(s) injected!")
+	if err := (&help).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
+		core2.Logger.Panicf("Help plugin MUST have all required service(s) injected!")
 		panic("Help plugin initialization failed.")
 	}
 	return &help

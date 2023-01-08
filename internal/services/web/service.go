@@ -1,13 +1,11 @@
 package web
 
 import (
-	"dalian-bot/internal/pkg/core"
+	core2 "dalian-bot/internal/core"
 	"github.com/gin-gonic/gin"
 	"reflect"
 	"sync"
 )
-
-var GinEngine *gin.Engine
 
 type Service struct {
 	GinEngine *gin.Engine
@@ -22,7 +20,7 @@ func (s *Service) Name() string {
 	return "web"
 }
 
-func (s *Service) Init(reg *core.ServiceRegistry) error {
+func (s *Service) Init(reg *core2.ServiceRegistry) error {
 	/* Setup Api Server */
 	engine := gin.Default()
 	//allow only redirection
@@ -33,12 +31,12 @@ func (s *Service) Init(reg *core.ServiceRegistry) error {
 
 func (s *Service) Start(wg *sync.WaitGroup) {
 	go s.GinEngine.Run(":8740")
-	core.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
+	core2.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
 	wg.Done()
 }
 
 func (s *Service) Stop(wg *sync.WaitGroup) error {
-	core.Logger.Debugf("Service [%s] is successfully closed.", reflect.TypeOf(s))
+	core2.Logger.Debugf("Service [%s] is successfully closed.", reflect.TypeOf(s))
 	wg.Done()
 	return nil
 }

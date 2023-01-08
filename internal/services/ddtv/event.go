@@ -1,7 +1,7 @@
 package ddtv
 
 import (
-	"dalian-bot/internal/pkg/core"
+	"dalian-bot/internal/core"
 )
 
 type EventType string

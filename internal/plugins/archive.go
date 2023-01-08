@@ -1,9 +1,9 @@
 package plugins
 
 import (
-	"dalian-bot/internal/pkg/core"
-	"dalian-bot/internal/pkg/services/data"
-	"dalian-bot/internal/pkg/services/discord"
+	core2 "dalian-bot/internal/core"
+	data2 "dalian-bot/internal/services/data"
+	discord2 "dalian-bot/internal/services/discord"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -17,13 +17,13 @@ import (
 )
 
 type ArchivePlugin struct {
-	core.Plugin
-	DiscordService *discord.Service
-	DataService    *data.Service
-	discord.SlashCommand
-	discord.IDisrocdHelper
-	core.ArgParseUtil
-	core.StageUtil
+	core2.Plugin
+	DiscordService *discord2.Service
+	DataService    *data2.Service
+	discord2.SlashCommand
+	discord2.IDisrocdHelper
+	core2.ArgParseUtil
+	core2.StageUtil
 }
 
 func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption) error {
@@ -51,7 +51,7 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 	aPo.setTime(true)
 	result := p.insertOneArchivePo(aPo)
 	if result.Err() != nil {
-		core.Logger.Warnf("Error inserting archive document: %v", result.Err())
+		core2.Logger.Warnf("Error inserting archive document: %v", result.Err())
 		p.DiscordService.InteractionRespond(i, "Internal error inserting! Please contact admin for help.")
 		return result.Err()
 	}
@@ -61,7 +61,7 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 		Title:       "Site saved",
 		Description: "The following site has been saved",
 		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       discord.EmbedColorNormal,
+		Color:       discord2.EmbedColorNormal,
 		Fields: []*discordgo.MessageEmbedField{{
 			Name:   "Temp Title", // todo: site title through snapshot or other ways
 			Value:  aPo.essentialInfoForEmbed(),
@@ -80,7 +80,7 @@ func (p *ArchivePlugin) handleListSite(i *discordgo.Interaction, optionsMap map[
 		query["tags"] = bson.M{"$all": parsedTags}
 
 	}
-	archiveListPager := discord.Pager{
+	archiveListPager := discord2.Pager{
 		IPagerLoader: &archivePoPagerLoader{
 			query:     query,
 			queryFunc: p.findArchivePo,
@@ -88,24 +88,24 @@ func (p *ArchivePlugin) handleListSite(i *discordgo.Interaction, optionsMap map[
 		PageNow: 1,
 		Limit:   7,
 		PrevPageButton: discordgo.Button{
-			Label:    discord.EmojiLeftArrow,
+			Label:    discord2.EmojiLeftArrow,
 			Style:    discordgo.PrimaryButton,
 			CustomID: lsButtonIDPrev,
 		},
 		NextPageButton: discordgo.Button{
-			Label:    discord.EmojiRightArrow,
+			Label:    discord2.EmojiRightArrow,
 			Style:    discordgo.PrimaryButton,
 			CustomID: lsButtonIDNext,
 		},
 		EmbedFrame: &discordgo.MessageEmbed{
 			Title:     "ls-site result",
-			Color:     discord.EmbedColorNormal,
+			Color:     discord2.EmbedColorNormal,
 			Timestamp: time.Now().Format(time.RFC3339),
 		},
 		Overtime: time.Duration(5) * time.Minute,
 	}
 	if err := archiveListPager.Setup(i, p.DiscordService); err != nil {
-		core.Logger.Warnf("Error setup pager: %v", err)
+		core2.Logger.Warnf("Error setup pager: %v", err)
 		return err
 	}
 	// all stages are now saved regardless of length, to support relative-id
@@ -170,7 +170,7 @@ func (p *ArchivePlugin) handleModifySite(i *discordgo.Interaction, optionsMap ma
 		Title:       "Site record updated",
 		Description: "The following site has been updated",
 		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       discord.EmbedColorNormal,
+		Color:       discord2.EmbedColorNormal,
 		Fields: []*discordgo.MessageEmbedField{{
 			Name:   modifyingPo.Title,
 			Value:  modifyingPo.essentialInfoForEmbed(),
@@ -209,7 +209,7 @@ func (p *ArchivePlugin) handleRemoveSite(i *discordgo.Interaction, optionsMap ma
 		Title:       "Site record deleted",
 		Description: "The following site has been deleted",
 		Timestamp:   time.Now().Format(time.RFC3339),
-		Color:       discord.EmbedColorNormal,
+		Color:       discord2.EmbedColorNormal,
 		Fields: []*discordgo.MessageEmbedField{{
 			Name:   deletingPo.Title,
 			Value:  deletingPo.essentialInfoForEmbed(),
@@ -219,10 +219,10 @@ func (p *ArchivePlugin) handleRemoveSite(i *discordgo.Interaction, optionsMap ma
 	return nil
 }
 
-func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.CombinedKey {
-	var key core.CombinedKey
+func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core2.CombinedKey {
+	var key core2.CombinedKey
 	var latestTime time.Time
-	p.StageUtil.IterThroughStage(func(k core.CombinedKey, v core.IStageNew) bool {
+	p.StageUtil.IterThroughStage(func(k core2.CombinedKey, v core2.IStageNew) bool {
 
 		if aqs, ok := (v).(*archiveQueryStage); ok {
 			if aqs.OwnerUserID == i.Member.User.ID && aqs.ChannelID == i.ChannelID {
@@ -237,7 +237,7 @@ func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.Comb
 	return key
 }
 
-func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (err error) {
+func (p *ArchivePlugin) DoNamedInteraction(_ *core2.Bot, i *discordgo.InteractionCreate) (err error) {
 	if match, name := p.DefaultMatchCommand(i); match {
 		switch name {
 		case "archive":
@@ -262,7 +262,7 @@ func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.Interaction
 	return nil
 }
 
-func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
+func (p *ArchivePlugin) Init(reg *core2.ServiceRegistry) error {
 	// services
 	//discordService is a MUST have. return error if not found.
 	if err := reg.FetchService(&p.DiscordService); err != nil {
@@ -273,16 +273,16 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 		return err
 	}
 	// core plugin type
-	p.Plugin = core.Plugin{
+	p.Plugin = core2.Plugin{
 		Name:                 "archive",
-		AcceptedTriggerTypes: []core.TriggerType{core.TriggerTypeDiscord},
+		AcceptedTriggerTypes: []core2.TriggerType{core2.TriggerTypeDiscord},
 	}
 	// utils
-	p.ArgParseUtil = core.ArgParseUtil{}
-	p.StageUtil = core.NewStageUtil()
+	p.ArgParseUtil = core2.ArgParseUtil{}
+	p.StageUtil = core2.NewStageUtil()
 
 	// discord
-	p.SlashCommand = discord.SlashCommand{AppCommandsMap: map[string]*discordgo.ApplicationCommand{}}
+	p.SlashCommand = discord2.SlashCommand{AppCommandsMap: map[string]*discordgo.ApplicationCommand{}}
 	p.AppCommandsMap.RegisterCommand(&discordgo.ApplicationCommand{
 		Name:        "archive",
 		Description: "archive certain things",
@@ -410,9 +410,9 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 Save the given website to dalian database. You will have the option to save a snapshot of it.`
 	formattedHelpSiteList := `*archive site list*: /archive site list
 List all sites archived by dalian. You can filter with tags.`
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDisrocdHelper = discord2.GenerateHelper(discord2.HelperConfig{
 		PluginHelp: "Archive online resources.",
-		CommandHelps: []discord.CommandHelp{
+		CommandHelps: []discord2.CommandHelp{
 			{
 				Name:          "archive site save",
 				FormattedHelp: formattedHelpSiteSet,
@@ -426,24 +426,24 @@ List all sites archived by dalian. You can filter with tags.`
 	return p.DiscordService.RegisterSlashCommand(p)
 }
 
-func (p *ArchivePlugin) Trigger(trigger core.Trigger) {
+func (p *ArchivePlugin) Trigger(trigger core2.Trigger) {
 
 	if !p.AcceptTrigger(trigger.Type) {
 		return
 	}
-	discordEvent := discord.UnboxEvent(trigger)
+	discordEvent := discord2.UnboxEvent(trigger)
 	switch discordEvent.EventType {
 	// only accepting interactionCreate for discord trigers
-	case discord.EventTypeInteractionCreate:
+	case discord2.EventTypeInteractionCreate:
 		switch discordEvent.InteractionCreate.Type {
 		case discordgo.InteractionApplicationCommand:
 			// slash command
 			if err := p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate); err != nil {
-				core.Logger.Warnf("Error executing slash command: %v", err)
+				core2.Logger.Warnf("Error executing slash command: %v", err)
 			}
 		case discordgo.InteractionMessageComponent:
 			// message component (pager)
-			if stage, ok := p.StageUtil.GetStage(core.CombinedKeyFromRaw(discordEvent.InteractionCreate.Message.ID)); ok {
+			if stage, ok := p.StageUtil.GetStage(core2.CombinedKeyFromRaw(discordEvent.InteractionCreate.Message.ID)); ok {
 				stage.Process(discordEvent.InteractionCreate.Interaction)
 			}
 		default:
@@ -536,7 +536,7 @@ func (p *ArchivePlugin) getCollection() *mongo.Collection {
 	return p.DataService.GetCollection("site_collection")
 }
 
-func (p *ArchivePlugin) insertOneArchivePo(po archivePO) data.Result {
+func (p *ArchivePlugin) insertOneArchivePo(po archivePO) data2.Result {
 	return p.DataService.InsertOne(po, p.getCollection(), context.Background())
 }
 
@@ -546,16 +546,16 @@ func (p *ArchivePlugin) findArchivePo(query any) ([]*archivePO, error) {
 	return results, err
 }
 
-func (p *ArchivePlugin) updateArchivePoWithID(po archivePO) data.Result {
-	return p.DataService.UpdateByID(bson.D{{"$set", data.ToBsonDocForce(po)}}, po.BsonID, p.getCollection(), context.Background())
+func (p *ArchivePlugin) updateArchivePoWithID(po archivePO) data2.Result {
+	return p.DataService.UpdateByID(bson.D{{"$set", data2.ToBsonDocForce(po)}}, po.BsonID, p.getCollection(), context.Background())
 }
 
-func (p *ArchivePlugin) deleteArchivePoWithID(po archivePO) data.Result {
+func (p *ArchivePlugin) deleteArchivePoWithID(po archivePO) data2.Result {
 	return p.DataService.DeleteOne(p.getCollection(), context.Background(), bson.M{"_id": po.BsonID})
 }
 
 type archiveQueryStage struct {
-	*discord.Pager
+	*discord2.Pager
 	UserID      string
 	ChannelID   string
 	GuildID     string
@@ -568,7 +568,7 @@ func (a *archiveQueryStage) Process(t any) {
 	a.triggerChan <- t.(*discordgo.Interaction)
 }
 
-func (a *archiveQueryStage) Init(pager *discord.Pager, plugin *ArchivePlugin) {
+func (a *archiveQueryStage) Init(pager *discord2.Pager, plugin *ArchivePlugin) {
 	a.Pager = pager
 	a.UserID = pager.OwnerUserID
 	a.ChannelID = pager.AttachedMessage.ChannelID
@@ -576,7 +576,7 @@ func (a *archiveQueryStage) Init(pager *discord.Pager, plugin *ArchivePlugin) {
 	a.CreatedTime = time.Now()
 	a.triggerChan = make(chan *discordgo.Interaction, 1)
 	a.plugin = plugin
-	key := core.CombinedKeyFromRaw(pager.AttachedMessage.ID)
+	key := core2.CombinedKeyFromRaw(pager.AttachedMessage.ID)
 	go func() {
 		plugin.StageUtil.StoreStage(key, a)
 		func() {
@@ -589,11 +589,11 @@ func (a *archiveQueryStage) Init(pager *discord.Pager, plugin *ArchivePlugin) {
 					}
 					switch interaction.MessageComponentData().CustomID {
 					case lsButtonIDPrev:
-						a.Pager.SwitchPage(core.PagerPrevPage, interaction)
+						a.Pager.SwitchPage(core2.PagerPrevPage, interaction)
 					case lsButtonIDNext:
-						a.Pager.SwitchPage(core.PagerNextPage, interaction)
+						a.Pager.SwitchPage(core2.PagerNextPage, interaction)
 					default:
-						core.Logger.Warnf("Unknown customID: %n" + interaction.MessageComponentData().CustomID)
+						core2.Logger.Warnf("Unknown customID: %n" + interaction.MessageComponentData().CustomID)
 						return
 					}
 				case <-time.After(a.Pager.Overtime):
@@ -617,27 +617,27 @@ type archivePoPagerLoader struct {
 	query          any
 	queryFunc      func(query any) ([]*archivePO, error)
 	resultsStorage []*archivePO
-	discord.DefaultPageRenderer
+	discord2.DefaultPageRenderer
 }
 
-func (s *archivePoPagerLoader) LoadPager(pager *discord.Pager) error {
+func (s *archivePoPagerLoader) LoadPager(pager *discord2.Pager) error {
 	var err error
 	s.resultsStorage, err = s.queryFunc(s.query)
 	if err != nil {
 		return err
 	}
 	for _, v := range s.resultsStorage {
-		var tempVar discord.IPagerPart
+		var tempVar discord2.IPagerPart
 		tempVar = v
 		pager.CompleteItemSlice = append(pager.CompleteItemSlice, &tempVar)
 	}
 	return nil
 }
 
-func NewArchivePlugin(reg *core.ServiceRegistry) core.INewPlugin {
+func NewArchivePlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
 	var archivePlugin ArchivePlugin
-	if err := (&archivePlugin).Init(reg); err != nil && errors.As(err, &core.ErrServiceFetchUnknownService) {
-		core.Logger.Panicf("Archive plugin MUST have all required service(s) injected!")
+	if err := (&archivePlugin).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
+		core2.Logger.Panicf("Archive plugin MUST have all required service(s) injected!")
 		panic("Archive plugin initialization failed.")
 	}
 	return &archivePlugin
