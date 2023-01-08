@@ -1,4 +1,4 @@
-package testing
+package experimental
 
 import (
 	"fmt"
@@ -124,13 +124,13 @@ func ListFiles() error {
 	//actually, parentFolderID
 	newFolderItem, err := onedriveClient.DriveItems.CreateNewFolder(context.Background(), "", "01MYC6HNVG2BYQ5L3VJJDJYZ2V3GOSHWAM", "Go Generated Folder")
 	if err != nil {
-		return errors.Wrap(err, "Failed creating testing folder")
+		return errors.Wrap(err, "Failed creating experimental folder")
 	}
-	fmt.Println("testing folder name:" + newFolderItem.Name + "||" + newFolderItem.Id)
+	fmt.Println("experimental folder name:" + newFolderItem.Name + "||" + newFolderItem.Id)
 	onedriveClient.DriveItems.Delete(context.Background(), "", newFolderItem.Id)
 	err = onedriveClient.DriveItems.Delete(context.Background(), "", newFolderItem.Id)
 	if err != nil {
-		return errors.Wrap(err, "failed deleting testing folder")
+		return errors.Wrap(err, "failed deleting experimental folder")
 	}
 
 	return nil

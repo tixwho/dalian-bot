@@ -1,4 +1,4 @@
-package testing
+package experimental
 
 import (
 	"fmt"
@@ -39,12 +39,12 @@ func TestMain(m *testing.M) {
 }
 
 /*
-func TestLogin(t *testing.T) {
+func TestLogin(t *experimental.T) {
 	stateError(t, Login())
 
 }
 
-func TestStorage(t *testing.T) {
+func TestStorage(t *experimental.T) {
 	stateError(t, Storage())
 }
 */
@@ -58,7 +58,7 @@ func TestLogin2(t *testing.T) {
 }
 
 /*
-func TestListFiles(t *testing.T) {
+func TestListFiles(t *experimental.T) {
 	stateError(t, ListFiles())
 }
 
