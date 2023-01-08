@@ -410,6 +410,13 @@ func (p *ArchivePlugin) Init(reg *core2.ServiceRegistry) error {
 Save the given website to dalian database. You will have the option to save a snapshot of it.`
 	formattedHelpSiteList := `*archive site list*: /archive site list
 List all sites archived by dalian. You can filter with tags.`
+	formattedHelpSiteModify := `*archive site modify*: /archive site modify
+Modify a site archived by dalian.
+You MUST first run a query with *archive site list* to get an active relative-ID for the site`
+	formattedHelpSiteDelete := `*archive site delete*: /archive site delete
+Delete a site archived by dalian.
+You MUST first run a query with *archive site list* to get an active relative-ID for the site`
+
 	p.IDisrocdHelper = discord2.GenerateHelper(discord2.HelperConfig{
 		PluginHelp: "Archive online resources.",
 		CommandHelps: []discord2.CommandHelp{
@@ -420,6 +427,14 @@ List all sites archived by dalian. You can filter with tags.`
 			{
 				Name:          "archive site list",
 				FormattedHelp: formattedHelpSiteList,
+			},
+			{
+				Name:          "archive site modify",
+				FormattedHelp: formattedHelpSiteModify,
+			},
+			{
+				Name:          "archive site delete",
+				FormattedHelp: formattedHelpSiteDelete,
 			},
 		},
 	})
