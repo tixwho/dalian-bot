@@ -1,7 +1,6 @@
 package core
 
 import (
-	"fmt"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -27,18 +26,6 @@ type OnedriveCred struct {
 }
 
 var credInternal Cred
-
-func GetCred(cred *Cred, fileLocation string) error {
-	yamlFile, err := os.ReadFile(fileLocation)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	err = yaml.Unmarshal(yamlFile, cred)
-	if err != nil {
-		return err
-	}
-	return nil
-}
 
 func GetCredNew(fileLocation string) (*Cred, error) {
 	if credInternal.Version == "" {
