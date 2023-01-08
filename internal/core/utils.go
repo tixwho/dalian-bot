@@ -6,7 +6,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"time"
 )
 
 // StartWithMatchUtil Text command triggers when a specific text is detected, the most common type of command
@@ -204,33 +203,21 @@ func tryInsertFlagMap(kvPair [2]string, flagMap FlagArgstatMaps) {
 	}
 }
 
-// BasicStageInfo Include shared information for staged actions
-type BasicStageInfo struct {
-	ChannelID      string
-	UserID         string
-	StageNow       int
-	LastActionTime time.Time
-}
-
-type IStage interface {
-	process()
-}
-
-type StageMap map[CombinedKey]IStageNew
+type StageMap map[CombinedKey]IStage
 
 type StageUtil struct {
 	*sync.RWMutex
 	StageMap
 }
 
-func (su *StageUtil) GetStage(key CombinedKey) (stage IStageNew, found bool) {
+func (su *StageUtil) GetStage(key CombinedKey) (stage IStage, found bool) {
 	su.RLock()
 	defer su.RUnlock()
 	v, ok := su.StageMap[key]
 	return v, ok
 }
 
-func (su *StageUtil) StoreStage(key CombinedKey, stage IStageNew) {
+func (su *StageUtil) StoreStage(key CombinedKey, stage IStage) {
 	su.Lock()
 	defer su.Unlock()
 	su.StageMap[key] = stage
@@ -242,7 +229,7 @@ func (su *StageUtil) DeleteStage(key CombinedKey) {
 	delete(su.StageMap, key)
 }
 
-func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value IStageNew) (stopIter bool)) {
+func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value IStage) (stopIter bool)) {
 	su.RLock()
 	defer su.RUnlock()
 	for k, v := range su.StageMap {
@@ -259,9 +246,12 @@ func NewStageUtil() StageUtil {
 	return StageUtil{&sync.RWMutex{}, make(StageMap)}
 }
 
-type IStageNew interface {
+// IStage IStage represent those structs carrying states.
+// Often used for timeout methods.
+type IStage interface {
 	Process(t any)
 }
+
 type PagerAction int
 
 const (

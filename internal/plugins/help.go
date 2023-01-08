@@ -139,7 +139,7 @@ func (p *HelpPlugin) Trigger(trigger core2.Trigger) {
 	}
 }
 
-func NewHelpPlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
+func NewHelpPlugin(reg *core2.ServiceRegistry) core2.IPlugin {
 	var help HelpPlugin
 	if err := (&help).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
 		core2.Logger.Panicf("Help plugin MUST have all required service(s) injected!")

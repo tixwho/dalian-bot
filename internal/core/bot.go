@@ -54,7 +54,7 @@ func (b *Bot) Run() {
 	}(b.DispatcherChan)
 }
 
-func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) INewPlugin) error {
+func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) IPlugin) error {
 	plugin := f(b.ServiceRegistry)
 	return b.PluginRegistry.RegisterPlugin(plugin)
 }

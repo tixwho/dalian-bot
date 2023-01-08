@@ -217,7 +217,7 @@ func (p *DDTVPlugin) findDDTVWebhookNotifyChannels() (channels []string, er erro
 
 }
 
-func NewDDTVPlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
+func NewDDTVPlugin(reg *core2.ServiceRegistry) core2.IPlugin {
 	var ddtvPlugin DDTVPlugin
 	if err := (&ddtvPlugin).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
 		core2.Logger.Panicf("DDTV plugin MUST have all required service(s) injected!")

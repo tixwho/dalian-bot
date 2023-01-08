@@ -28,7 +28,7 @@ func main() {
 		}
 
 	*/
-	cred, err := core2.GetCredNew("config/credentials.yaml")
+	cred, err := core2.GetCred("config/credentials.yaml")
 	if err != nil {
 		panic("credential test failed")
 	}

@@ -222,7 +222,7 @@ func (p *ArchivePlugin) handleRemoveSite(i *discordgo.Interaction, optionsMap ma
 func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core2.CombinedKey {
 	var key core2.CombinedKey
 	var latestTime time.Time
-	p.StageUtil.IterThroughStage(func(k core2.CombinedKey, v core2.IStageNew) bool {
+	p.StageUtil.IterThroughStage(func(k core2.CombinedKey, v core2.IStage) bool {
 
 		if aqs, ok := (v).(*archiveQueryStage); ok {
 			if aqs.OwnerUserID == i.Member.User.ID && aqs.ChannelID == i.ChannelID {
@@ -634,7 +634,7 @@ func (s *archivePoPagerLoader) LoadPager(pager *discord2.Pager) error {
 	return nil
 }
 
-func NewArchivePlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
+func NewArchivePlugin(reg *core2.ServiceRegistry) core2.IPlugin {
 	var archivePlugin ArchivePlugin
 	if err := (&archivePlugin).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
 		core2.Logger.Panicf("Archive plugin MUST have all required service(s) injected!")

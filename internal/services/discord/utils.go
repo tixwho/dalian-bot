@@ -58,18 +58,8 @@ type IDisrocdHelper interface {
 	DiscordCommandHelp(text string) string
 }
 
+// ITextCommand Discord commands that may be triggered by plain discord message.
 type ITextCommand interface {
-	// Deprecated: use MatchMessageNew
-	MatchMessage(m *discordgo.MessageCreate) (isMatched bool, isTerminated bool)
-	// DoMessage All command wlll do something
-	// a anything you may need to execute. It is your OWN responsibility to validate before use.
-	// err if anything worth *reporting* happened. expected error should not be returned.
-	DoMessage(m *discordgo.MessageCreate) (err error)
-
-	DoMessageNew(m *discordgo.MessageCreate)
-}
-
-type ITextCommandNew interface {
 	DoMessage(b *core2.Bot, m *discordgo.MessageCreate) (err error)
 }
 
@@ -79,15 +69,10 @@ func (acm *AppCommandsMap) RegisterCommand(cmd *discordgo.ApplicationCommand) {
 	(*acm)[cmd.Name] = cmd
 }
 
+// ISlashCommand Discord commands that may be triggered by slash (`/`)
 type ISlashCommand interface {
-	MatchNamedInteraction(i *discordgo.InteractionCreate) (isMatched bool)
-	DoNamedInteraction(i *discordgo.InteractionCreate) (err error)
-	GetAppCommandsMap() AppCommandsMap
-}
-
-type ISlashCommandNew interface {
 	DoNamedInteraction(b *core2.Bot, i *discordgo.InteractionCreate) (err error)
-	GetAppCommandsMap() AppCommandsMap
+	GetAppCommandsMap() AppCommandsMap // often provided by SlashCommand struct
 }
 
 type SlashCommand struct {
@@ -132,29 +117,6 @@ func (b BotCallingCommand) IsCallingBot(content string, config core2.MessengerCo
 		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
 	}
 	return false, ""
-}
-
-type ComponentActionMap map[string]func(i *discordgo.InteractionCreate)
-
-type IComponentCommand interface {
-	GetCompActionMap() ComponentActionMap
-	IsComponentInteraction(i *discordgo.InteractionCreate) bool
-	DoComponentInteraction(b *core2.Bot, i *discordgo.InteractionCreate) error
-}
-
-type ComponentCommand struct {
-	CompActionMap ComponentActionMap
-}
-
-func (cm *ComponentCommand) GetCompActionMap() ComponentActionMap {
-	return cm.CompActionMap
-}
-
-func (cm *ComponentCommand) IsComponentInteraction(i *discordgo.InteractionCreate) bool {
-	if i.Type == discordgo.InteractionMessageComponent {
-		return true
-	}
-	return false
 }
 
 type IPagerLoader interface {

@@ -67,7 +67,7 @@ func (p *WhatPlugin) Trigger(trigger core2.Trigger) {
 	}
 }
 
-func NewWhatPlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
+func NewWhatPlugin(reg *core2.ServiceRegistry) core2.IPlugin {
 	var what WhatPlugin
 	if err := (&what).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
 		core2.Logger.Panicf("What plugin MUST have all required service(s) injected!")

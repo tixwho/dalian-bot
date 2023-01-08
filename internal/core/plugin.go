@@ -6,15 +6,15 @@ import (
 )
 
 type PluginRegistry struct {
-	plugins     map[reflect.Type]INewPlugin
+	plugins     map[reflect.Type]IPlugin
 	pluginTypes []reflect.Type
 }
 
 func NewPluginRegistry() *PluginRegistry {
-	return &PluginRegistry{plugins: make(map[reflect.Type]INewPlugin)}
+	return &PluginRegistry{plugins: make(map[reflect.Type]IPlugin)}
 }
 
-func (s *PluginRegistry) RegisterPlugin(plugin INewPlugin) error {
+func (s *PluginRegistry) RegisterPlugin(plugin IPlugin) error {
 	kind := reflect.TypeOf(plugin)
 	if _, exists := s.plugins[kind]; exists {
 		return fmt.Errorf("plugin already exists: %v", kind)
@@ -25,7 +25,7 @@ func (s *PluginRegistry) RegisterPlugin(plugin INewPlugin) error {
 	return nil
 }
 
-func (s *PluginRegistry) GetPlugins() map[reflect.Type]INewPlugin {
+func (s *PluginRegistry) GetPlugins() map[reflect.Type]IPlugin {
 	return s.plugins
 }
 
@@ -54,11 +54,13 @@ func (p *Plugin) AcceptTrigger(t TriggerType) bool {
 	return false
 }
 
-// INewPlugin temporal use. wll be replaced
-type INewPlugin interface {
-	// GetName All command must have a name (unique identifier)
-	GetName() string
+// IPlugin Top-level plugin interface
+type IPlugin interface {
+
+	// GetName all plugins have their name.
+	GetName() string                  // provided by Plugin
+	AcceptTrigger(t TriggerType) bool // provided by Plugin
+
 	Init(reg *ServiceRegistry) error
-	AcceptTrigger(t TriggerType) bool
 	Trigger(trigger Trigger)
 }

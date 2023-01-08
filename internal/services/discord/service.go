@@ -192,7 +192,7 @@ func (s *Service) DisposeAllSlashCommand() error {
 	return nil
 }
 
-func (s *Service) DisposeSlashCommand(command core2.INewPlugin) error {
+func (s *Service) DisposeSlashCommand(command core2.IPlugin) error {
 	if slash, ok := command.(ISlashCommand); ok {
 		for _, cmd := range slash.GetAppCommandsMap() {
 			s.registeredCommands = s.registeredCommands.delete(cmd)
@@ -202,8 +202,8 @@ func (s *Service) DisposeSlashCommand(command core2.INewPlugin) error {
 	return nil
 }
 
-func (s *Service) RegisterSlashCommand(plugin core2.INewPlugin) error {
-	if slash, ok := plugin.(ISlashCommandNew); ok {
+func (s *Service) RegisterSlashCommand(plugin core2.IPlugin) error {
+	if slash, ok := plugin.(ISlashCommand); ok {
 		for _, cmd := range slash.GetAppCommandsMap() {
 			cmd, err := s.Session.ApplicationCommandCreate(s.Session.State.User.ID, "", cmd)
 			if err != nil {

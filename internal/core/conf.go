@@ -27,7 +27,7 @@ type OnedriveCred struct {
 
 var credInternal Cred
 
-func GetCredNew(fileLocation string) (*Cred, error) {
+func GetCred(fileLocation string) (*Cred, error) {
 	if credInternal.Version == "" {
 		yamlFile, err := os.ReadFile(fileLocation)
 		if err != nil {

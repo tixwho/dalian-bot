@@ -91,7 +91,7 @@ func (p *PingPlugin) Trigger(trigger core2.Trigger) {
 	}
 }
 
-func NewPingPlugin(reg *core2.ServiceRegistry) core2.INewPlugin {
+func NewPingPlugin(reg *core2.ServiceRegistry) core2.IPlugin {
 	var ping PingPlugin
 	if err := (&ping).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
 		core2.Logger.Panicf("Ping plugin MUST have all required service(s) injected!")
