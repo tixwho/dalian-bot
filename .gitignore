@@ -14,8 +14,11 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-#sensitive credentials that should not be exposed
+# sensitive credentials that should not be exposed
 config/credentials.yaml
 
-#idea settings
+# testing features
+internal/pkg/testing/
+
+# idea settings
 .idea/
