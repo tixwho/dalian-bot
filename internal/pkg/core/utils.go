@@ -219,32 +219,48 @@ type IStage interface {
 type StageMap map[CombinedKey]IStageNew
 
 type StageUtil struct {
-	activeStageMap sync.Map
+	*sync.RWMutex
+	StageMap
 }
 
 func (su *StageUtil) GetStage(key CombinedKey) (stage IStageNew, found bool) {
-	v, ok := su.activeStageMap.Load(key)
-	return v.(IStageNew), ok
+	su.RLock()
+	defer su.RUnlock()
+	v, ok := su.StageMap[key]
+	return v, ok
 }
 
-func (su *StageUtil) StoretStage(key CombinedKey, stage IStageNew) {
-	su.activeStageMap.Store(key, stage)
+func (su *StageUtil) StoreStage(key CombinedKey, stage IStageNew) {
+	su.Lock()
+	defer su.Unlock()
+	su.StageMap[key] = stage
 }
 
 func (su *StageUtil) DeleteStage(key CombinedKey) {
-	su.activeStageMap.Delete(key)
+	su.Lock()
+	defer su.Unlock()
+	delete(su.StageMap, key)
 }
 
-func (su *StageUtil) IterThroughStage(f func(key, value any) (stopIter bool)) {
-	su.activeStageMap.Range(f)
+func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value IStageNew) (stopIter bool)) {
+	su.RLock()
+	defer su.RUnlock()
+	for k, v := range su.StageMap {
+		// release the lock and allow modification
+		su.RUnlock()
+		if f(k, v) {
+			return // Rlock handled by defer
+		}
+		su.RLock() // lock it back
+	}
 }
 
 func NewStageUtil() StageUtil {
-	return StageUtil{}
+	return StageUtil{&sync.RWMutex{}, make(StageMap)}
 }
 
 type IStageNew interface {
-	Process(t Trigger)
+	Process(t any)
 }
 type PagerAction int
 

@@ -35,7 +35,7 @@ func Login() error {
 	if err != nil {
 		return fmt.Errorf("could not auth from a credentials: %w", err)
 	}
-	fmt.Println("Token:" + authRes.AccessToken)
+	fmt.Println("DiscordToken:" + authRes.AccessToken)
 	accessToken = authRes.AccessToken
 	fmt.Println(authRes)
 	return nil
@@ -82,7 +82,7 @@ func LoginGetToken(authCode string) error {
 	if err != nil {
 		return fmt.Errorf("could not auth from a credentials: %w", err)
 	}
-	fmt.Println("Token:" + authRes.AccessToken)
+	fmt.Println("DiscordToken:" + authRes.AccessToken)
 	accessToken = authRes.AccessToken
 	fmt.Println(authRes)
 	return nil

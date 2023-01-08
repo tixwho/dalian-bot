@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/net/context"
@@ -54,6 +55,8 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 		p.DiscordService.InteractionRespond(i, "Internal error inserting! Please contact admin for help.")
 		return result.Err()
 	}
+	// todo: replace it with actual title saving
+	aPo.Title = "Temporary Title"
 	p.DiscordService.InteractionRespondEmbed(i, &discordgo.MessageEmbed{
 		Title:       "Site saved",
 		Description: "The following site has been saved",
@@ -68,6 +71,172 @@ func (p *ArchivePlugin) handleSaveSite(i *discordgo.Interaction, optionsMap map[
 	return nil
 }
 
+func (p *ArchivePlugin) handleListSite(i *discordgo.Interaction, optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption) error {
+	query := bson.M{"user_id": i.Member.User.ID, "guild_id": i.GuildID}
+	//if found optional tags, add it to the query
+	//set tags
+	if tagsOption, ok := optionsMap["tags"]; ok {
+		parsedTags := p.SeparateArgs(tagsOption.StringValue(), p.DiscordService.DiscordAccountConfig.Separator)
+		query["tags"] = bson.M{"$all": parsedTags}
+
+	}
+	archiveListPager := discord.Pager{
+		IPagerLoader: &archivePoPagerLoader{
+			query:     query,
+			queryFunc: p.findArchivePo,
+		},
+		PageNow: 1,
+		Limit:   7,
+		PrevPageButton: discordgo.Button{
+			Label:    discord.EmojiLeftArrow,
+			Style:    discordgo.PrimaryButton,
+			CustomID: lsButtonIDPrev,
+		},
+		NextPageButton: discordgo.Button{
+			Label:    discord.EmojiRightArrow,
+			Style:    discordgo.PrimaryButton,
+			CustomID: lsButtonIDNext,
+		},
+		EmbedFrame: &discordgo.MessageEmbed{
+			Title:     "ls-site result",
+			Color:     discord.EmbedColorNormal,
+			Timestamp: time.Now().Format(time.RFC3339),
+		},
+		Overtime: time.Duration(5) * time.Minute,
+	}
+	if err := archiveListPager.Setup(i, p.DiscordService); err != nil {
+		core.Logger.Warnf("Error setup pager: %v", err)
+		return err
+	}
+	// all stages are now saved regardless of length, to support relative-id
+	//if archiveListPager.PageMax > 1 {
+	//	var stage archiveQueryStage
+	//	stage.Init(&archiveListPager, p)
+	//}
+	var stage archiveQueryStage
+	stage.Init(&archiveListPager, p)
+	return nil
+}
+
+func (p *ArchivePlugin) handleModifySite(i *discordgo.Interaction, optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption) error {
+	tempID, ok := optionsMap["relative-id"]
+	if !ok {
+		p.DiscordService.InteractionRespond(i, "no relative-ID provided!")
+		return nil
+	}
+	id := int(tempID.IntValue())
+	////old logic
+	//modifyingPo, err := retrieveSitePoByNumericalID(id.IntValue())
+	//new logic
+	key := p.findActiveRelativeID(i)
+	if key == "" {
+		p.DiscordService.InteractionRespond(i, "No active query for you! Run a new query first?")
+		return nil
+	}
+	rawStage, _ := p.StageUtil.GetStage(key)
+	aqs := rawStage.(*archiveQueryStage)
+	if id <= 0 || id > len(aqs.Pager.CompleteItemSlice) {
+		p.DiscordService.InteractionRespond(i, "Malformed relative-ID. Check your last query?")
+		return nil
+	}
+	modifyingPo := (*aqs.Pager.CompleteItemSlice[id-1]).(*archivePO)
+	tempTags, ok := optionsMap["tags"]
+	if ok {
+		tagsStr := tempTags.StringValue()
+		if tagsStr == "-" {
+			//clean up
+			modifyingPo.Tags = []string{}
+		} else {
+			ephemeralTags := p.SeparateArgs(tagsStr, p.DiscordService.DiscordAccountConfig.Separator)
+			modifyingPo.Tags = ephemeralTags
+		}
+	}
+	tempNote, ok := optionsMap["note"]
+	if ok {
+		noteStr := tempNote.StringValue()
+		if noteStr == "-" {
+			//clean up
+			modifyingPo.Note = ""
+		} else {
+			modifyingPo.Note = noteStr
+		}
+	}
+	res := p.updateArchivePoWithID(*modifyingPo)
+	if res.Err() != nil {
+		p.DiscordService.InteractionRespond(i, res.Err().Error())
+		return nil
+	}
+	return p.DiscordService.InteractionRespondEmbed(i, &discordgo.MessageEmbed{
+		Title:       "Site record updated",
+		Description: "The following site has been updated",
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Color:       discord.EmbedColorNormal,
+		Fields: []*discordgo.MessageEmbedField{{
+			Name:   modifyingPo.Title,
+			Value:  modifyingPo.essentialInfoForEmbed(),
+			Inline: false,
+		}},
+	}, nil)
+}
+
+func (p *ArchivePlugin) handleRemoveSite(i *discordgo.Interaction, optionsMap map[string]*discordgo.ApplicationCommandInteractionDataOption) error {
+	tempID, ok := optionsMap["relative-id"]
+	if !ok {
+		p.DiscordService.InteractionRespond(i, "no relative-ID provided!")
+		return nil
+	}
+	id := int(tempID.IntValue())
+
+	//new logic
+	key := p.findActiveRelativeID(i)
+	if key == "" {
+		p.DiscordService.InteractionRespond(i, "No active query for you! Run a new query first?")
+		return nil
+	}
+	rawStage, _ := p.StageUtil.GetStage(key)
+	aqs := rawStage.(*archiveQueryStage)
+	if id <= 0 || id > len(aqs.Pager.CompleteItemSlice) {
+		p.DiscordService.InteractionRespond(i, "Malformed relative-ID. Check your last query?")
+		return nil
+	}
+	deletingPo := (*aqs.Pager.CompleteItemSlice[id-1]).(*archivePO)
+	delResult := p.deleteArchivePoWithID(*deletingPo)
+	if delResult.Err() != nil {
+		p.DiscordService.InteractionRespond(i, delResult.Err().Error())
+		return nil
+	}
+	p.DiscordService.InteractionRespondEmbed(i, &discordgo.MessageEmbed{
+		Title:       "Site record deleted",
+		Description: "The following site has been deleted",
+		Timestamp:   time.Now().Format(time.RFC3339),
+		Color:       discord.EmbedColorNormal,
+		Fields: []*discordgo.MessageEmbedField{{
+			Name:   deletingPo.Title,
+			Value:  deletingPo.essentialInfoForEmbed(),
+			Inline: false,
+		}},
+	}, nil)
+	return nil
+}
+
+func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.CombinedKey {
+	var key core.CombinedKey
+	var latestTime time.Time
+	p.StageUtil.IterThroughStage(func(k core.CombinedKey, v core.IStageNew) bool {
+
+		if aqs, ok := (v).(*archiveQueryStage); ok {
+			if aqs.OwnerUserID == i.Member.User.ID && aqs.ChannelID == i.ChannelID {
+				if aqs.CreatedTime.After(latestTime) {
+					latestTime = aqs.CreatedTime
+					key = k
+				}
+			}
+		}
+		return false
+	})
+	return key
+}
+
 func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (err error) {
 	if match, name := p.DefaultMatchCommand(i); match {
 		switch name {
@@ -76,10 +245,16 @@ func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.Interaction
 			switch cmdOption.Name {
 			case "site":
 				cmdOption := cmdOption.Options[0]
+				optionsMap := p.ParseOptionsMap(cmdOption.Options)
 				switch cmdOption.Name {
 				case "save":
-					optionsMap := p.ParseOptionsMap(cmdOption.Options)
 					return p.handleSaveSite(i.Interaction, optionsMap)
+				case "list":
+					return p.handleListSite(i.Interaction, optionsMap)
+				case "modify":
+					return p.handleModifySite(i.Interaction, optionsMap)
+				case "remove":
+					return p.handleRemoveSite(i.Interaction, optionsMap)
 				}
 			}
 		}
@@ -155,6 +330,75 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 						Name:        "list",
 						Type:        discordgo.ApplicationCommandOptionSubCommand,
 						Description: "List all sites",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type: discordgo.ApplicationCommandOptionString,
+								Name: "tags",
+								//late init, replace %s with separator
+								Description: fmt.Sprintf("Search tags for this site, separated by default separator."+
+									" Current separator:[%s]", p.DiscordService.DiscordAccountConfig.Separator),
+								Required: false,
+							},
+						},
+					},
+					{
+						Name:        "modify",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Modify the given site.",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionInteger,
+								Name:        "relative-id",
+								Description: "The relative id of item in the last query",
+								Required:    true,
+							},
+							{
+								Type:        discordgo.ApplicationCommandOptionString,
+								Name:        "url",
+								Description: "The valid Url to be stored into database.",
+								Required:    false,
+							},
+							{
+								Type: discordgo.ApplicationCommandOptionString,
+								Name: "tags",
+								//late init, replace %s with separator
+								Description: fmt.Sprintf("Add tags for this site, separated by default separator."+
+									" Current separator:[%s]", p.DiscordService.DiscordAccountConfig.Separator),
+								Required: false,
+							},
+							{
+								Type: discordgo.ApplicationCommandOptionString,
+								Name: "note",
+								//same as above
+								Description: fmt.Sprintf("Add note for this site."+
+									" Current separator:[%s]", p.DiscordService.DiscordAccountConfig.Separator),
+								Required: false,
+							},
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "cache",
+								Description: "Re-cache the given site",
+								Required:    false,
+							},
+						},
+					}, {
+						Name:        "remove",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Remove the given site.",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionInteger,
+								Name:        "relative-id",
+								Description: "The relative id of item in the last query",
+								Required:    true,
+							},
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "cache",
+								Description: "Should cache be deleted, if present",
+								Required:    false,
+							},
+						},
 					},
 				},
 			},
@@ -194,7 +438,14 @@ func (p *ArchivePlugin) Trigger(trigger core.Trigger) {
 		switch discordEvent.InteractionCreate.Type {
 		case discordgo.InteractionApplicationCommand:
 			// slash command
-			p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate)
+			if err := p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate); err != nil {
+				core.Logger.Warnf("Error executing slash command: %v", err)
+			}
+		case discordgo.InteractionMessageComponent:
+			// message component (pager)
+			if stage, ok := p.StageUtil.GetStage(core.CombinedKeyFromRaw(discordEvent.InteractionCreate.Message.ID)); ok {
+				stage.Process(discordEvent.InteractionCreate.Interaction)
+			}
 		default:
 			// todo: accept components
 			return
@@ -291,8 +542,96 @@ func (p *ArchivePlugin) insertOneArchivePo(po archivePO) data.Result {
 
 func (p *ArchivePlugin) findArchivePo(query any) ([]*archivePO, error) {
 	var results []*archivePO
-	err := p.DataService.Find(results, p.getCollection(), context.Background(), query)
+	err := p.DataService.Find(&results, p.getCollection(), context.Background(), query)
 	return results, err
+}
+
+func (p *ArchivePlugin) updateArchivePoWithID(po archivePO) data.Result {
+	return p.DataService.UpdateByID(bson.D{{"$set", data.ToBsonDocForce(po)}}, po.BsonID, p.getCollection(), context.Background())
+}
+
+func (p *ArchivePlugin) deleteArchivePoWithID(po archivePO) data.Result {
+	return p.DataService.DeleteOne(p.getCollection(), context.Background(), bson.M{"_id": po.BsonID})
+}
+
+type archiveQueryStage struct {
+	*discord.Pager
+	UserID      string
+	ChannelID   string
+	GuildID     string
+	CreatedTime time.Time
+	triggerChan chan *discordgo.Interaction
+	plugin      *ArchivePlugin
+}
+
+func (a *archiveQueryStage) Process(t any) {
+	a.triggerChan <- t.(*discordgo.Interaction)
+}
+
+func (a *archiveQueryStage) Init(pager *discord.Pager, plugin *ArchivePlugin) {
+	a.Pager = pager
+	a.UserID = pager.OwnerUserID
+	a.ChannelID = pager.AttachedMessage.ChannelID
+	a.GuildID = pager.AttachedMessage.GuildID
+	a.CreatedTime = time.Now()
+	a.triggerChan = make(chan *discordgo.Interaction, 1)
+	a.plugin = plugin
+	key := core.CombinedKeyFromRaw(pager.AttachedMessage.ID)
+	go func() {
+		plugin.StageUtil.StoreStage(key, a)
+		func() {
+			for {
+				select {
+				case interaction, ok := <-a.triggerChan:
+					if !ok {
+						fmt.Println("Aborted")
+						return
+					}
+					switch interaction.MessageComponentData().CustomID {
+					case lsButtonIDPrev:
+						a.Pager.SwitchPage(core.PagerPrevPage, interaction)
+					case lsButtonIDNext:
+						a.Pager.SwitchPage(core.PagerNextPage, interaction)
+					default:
+						core.Logger.Warnf("Unknown customID: %n" + interaction.MessageComponentData().CustomID)
+						return
+					}
+				case <-time.After(a.Pager.Overtime):
+					//overtime termination sign
+					fmt.Println("terminating through overtime")
+					return
+				}
+			}
+		}()
+		a.Pager.LockPagerButtons()
+		plugin.StageUtil.DeleteStage(key)
+	}()
+}
+
+const (
+	lsButtonIDPrev = "ls-archive-prev"
+	lsButtonIDNext = "ls-archive-next"
+)
+
+type archivePoPagerLoader struct {
+	query          any
+	queryFunc      func(query any) ([]*archivePO, error)
+	resultsStorage []*archivePO
+	discord.DefaultPageRenderer
+}
+
+func (s *archivePoPagerLoader) LoadPager(pager *discord.Pager) error {
+	var err error
+	s.resultsStorage, err = s.queryFunc(s.query)
+	if err != nil {
+		return err
+	}
+	for _, v := range s.resultsStorage {
+		var tempVar discord.IPagerPart
+		tempVar = v
+		pager.CompleteItemSlice = append(pager.CompleteItemSlice, &tempVar)
+	}
+	return nil
 }
 
 func NewArchivePlugin(reg *core.ServiceRegistry) core.INewPlugin {

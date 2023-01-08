@@ -19,16 +19,19 @@ type PingPlugin struct {
 }
 
 func (p *PingPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (err error) {
-	if match, name := p.DefaultMatchCommand(i); match {
-		switch name {
-		case "ping":
-			p.DiscordService.ChannelMessageSend(i.ChannelID, "pong response not using interaction!")
-			p.DiscordService.InteractionRespondComplex(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "pong response with discord interaction!!",
-				},
-			})
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		if match, name := p.DefaultMatchCommand(i); match {
+			switch name {
+			case "ping":
+				p.DiscordService.ChannelMessageSend(i.ChannelID, "pong response not using interaction!")
+				p.DiscordService.InteractionRespondComplex(i.Interaction, &discordgo.InteractionResponse{
+					Type: discordgo.InteractionResponseChannelMessageWithSource,
+					Data: &discordgo.InteractionResponseData{
+						Content: "pong response with discord interaction!!",
+					},
+				})
+			}
 		}
 	}
 	return nil

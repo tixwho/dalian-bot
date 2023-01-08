@@ -156,6 +156,11 @@ func (p *DDTVPlugin) Trigger(trigger core.Trigger) {
 	case core.TriggerTypeDDTV:
 		// do ddtv webhook thing
 		ddtvEvent := ddtv.UnboxEvent(trigger)
+		webhook := ddtv.UnboxEvent(trigger).WebHook
+		// if hooktype is channel, restrict non-record channel message to online.
+		if webhook.UserInfo.UID != 0 && !webhook.RoomInfo.IsAutoRec && webhook.Type != ddtv.HookStartLive {
+			return
+		}
 		p.notifyDDTVWebhookToChannels(ddtvEvent.WebHook)
 	default:
 		core.Logger.Warnf(core.LogPromptUnknownTrigger, trigger.Type)

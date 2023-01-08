@@ -172,6 +172,8 @@ type Pager struct {
 	//core page loading functions, to be implemented
 	IPagerLoader
 	discordService *Service
+	//owner of this pager
+	OwnerUserID string
 	//autofilled later
 	AttachedMessage *discordgo.Message
 	//pagination cache. need fo fill Limit
@@ -225,6 +227,7 @@ func (bp *Pager) Setup(trigger any, service *Service) error {
 			return fmt.Errorf("failed loading attached message from interaction%w", err)
 		} else {
 			bp.AttachedMessage = attachedMsg
+			bp.OwnerUserID = i.Member.User.ID
 		}
 	} else if m, ok := trigger.(*discordgo.Message); ok {
 		//Raw command (Message)
@@ -232,6 +235,7 @@ func (bp *Pager) Setup(trigger any, service *Service) error {
 			return fmt.Errorf("failed loading attached message from message%w", err)
 		} else {
 			bp.AttachedMessage = attachedMessage
+			bp.OwnerUserID = i.Member.User.ID
 		}
 	} else {
 		return errors.New("unknown trigger type, pager initialization failed")
@@ -291,7 +295,7 @@ func (bp *Pager) LockPagerButtons() error {
 }
 
 type IPagerPart interface {
-	ToMessageEmbedField() *discordgo.MessageEmbedField
+	ToMessageEmbedField(displayID int) *discordgo.MessageEmbedField
 }
 
 type DefaultPageRenderer struct{}
@@ -325,9 +329,9 @@ func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFram
 	pager.displayItemSlice = pager.CompleteItemSlice[lowerLimit:upperLimit]
 	//rendering
 	var alterFields []*discordgo.MessageEmbedField
-	for _, pagerPart := range pager.displayItemSlice {
+	for k, pagerPart := range pager.displayItemSlice {
 		var part = *pagerPart
-		alterFields = append(alterFields, part.ToMessageEmbedField())
+		alterFields = append(alterFields, part.ToMessageEmbedField((toPage-1)*limit+k+1))
 	}
 	embedFrame.Fields = alterFields
 	embedFrame.Footer = &discordgo.MessageEmbedFooter{Text: fmt.Sprintf("page: %d/%d", toPage, maxPage)}

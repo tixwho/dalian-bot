@@ -111,6 +111,15 @@ func (s *Service) UpdateOne(subject any, collection *mongo.Collection, ctx conte
 	return NewSuccessResult(updateResult)
 }
 
+func (s *Service) UpdateByID(subject any, id any, collection *mongo.Collection, ctx context.Context, options ...*options.UpdateOptions) Result {
+	updateResult, err := collection.UpdateByID(ctx, id, subject, options...)
+	if err != nil {
+		core.Logger.Warnf("Database update error: %v", err)
+		return NewErrorResult(err)
+	}
+	return NewSuccessResult(updateResult)
+}
+
 func (s *Service) DeleteOne(collection *mongo.Collection, ctx context.Context, filter any,
 	options ...*options.DeleteOptions) Result {
 	deleteResult, err := collection.DeleteOne(ctx, filter, options...)
@@ -123,19 +132,4 @@ func (s *Service) DeleteOne(collection *mongo.Collection, ctx context.Context, f
 
 type ServiceConfig struct {
 	URI string
-}
-
-func GetCollection(name string, opts ...*options.CollectionOptions) *mongo.Collection {
-	return DalianDB.Collection(name, opts...)
-}
-
-var MongoClient *mongo.Client
-var DalianDB *mongo.Database
-
-func RegisterMongoClient(client *mongo.Client) {
-	MongoClient = client
-}
-
-func ConnectToDB(dbName string) {
-	DalianDB = MongoClient.Database(dbName)
 }

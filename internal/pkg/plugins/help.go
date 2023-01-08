@@ -21,17 +21,21 @@ type HelpPlugin struct {
 
 // DoNamedInteraction `/help [command-name]` support
 func (p *HelpPlugin) DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (err error) {
-	if match, name := p.DefaultMatchCommand(i); match {
-		switch name {
-		case "help":
-			optionsMap := p.ParseOptionsMap(i.ApplicationCommandData().Options)
-			if commandName, ok := optionsMap["command-name"]; ok {
-				p.DiscordService.InteractionRespond(i.Interaction, parseHelpText(b, commandName.StringValue()))
-			} else {
-				p.DiscordService.InteractionRespond(i.Interaction, parseHelpText(b, ""))
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		if match, name := p.DefaultMatchCommand(i); match {
+			switch name {
+			case "help":
+				optionsMap := p.ParseOptionsMap(i.ApplicationCommandData().Options)
+				if commandName, ok := optionsMap["command-name"]; ok {
+					p.DiscordService.InteractionRespond(i.Interaction, parseHelpText(b, commandName.StringValue()))
+				} else {
+					p.DiscordService.InteractionRespond(i.Interaction, parseHelpText(b, ""))
+				}
 			}
 		}
 	}
+
 	return nil
 }
 
