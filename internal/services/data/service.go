@@ -1,7 +1,7 @@
 package data
 
 import (
-	core2 "dalian-bot/internal/core"
+	"dalian-bot/internal/core"
 	"errors"
 	"fmt"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,7 +20,7 @@ func (s *Service) Name() string {
 	return "data"
 }
 
-func (s *Service) Init(reg *core2.ServiceRegistry) error {
+func (s *Service) Init(reg *core.ServiceRegistry) error {
 	reg.RegisterService(s)
 	return nil
 }
@@ -32,7 +32,7 @@ func (s *Service) Start(wg *sync.WaitGroup) {
 		panic(err)
 	}
 	s.Client = mongoClient
-	core2.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
+	core.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
 	wg.Done()
 }
 
@@ -40,7 +40,7 @@ func (s *Service) Stop(wg *sync.WaitGroup) error {
 	if err := s.Client.Disconnect(context.TODO()); err != nil {
 		fmt.Println("error closing Mongo connection!")
 	}
-	core2.Logger.Debugf("Service [%s] is successfully closed.", reflect.TypeOf(s))
+	core.Logger.Debugf("Service [%s] is successfully closed.", reflect.TypeOf(s))
 	wg.Done()
 	return nil
 }
@@ -62,11 +62,11 @@ func (s *Service) Find(receiver any, collection *mongo.Collection, ctx context.C
 	}
 	findCursor, err := collection.Find(ctx, filter, options...)
 	if err != nil {
-		core2.Logger.Warnf("Database cursor error: %v", err)
+		core.Logger.Warnf("Database cursor error: %v", err)
 		return err
 	}
 	if err = findCursor.All(context.TODO(), receiver); err != nil {
-		core2.Logger.Warnf("Database unmarshal error: %v", err)
+		core.Logger.Warnf("Database unmarshal error: %v", err)
 		return err
 	}
 	return nil
@@ -83,7 +83,7 @@ func (s *Service) FindOne(receiver any, collection *mongo.Collection, ctx contex
 		return NewErrorResult(findOneResult.Err())
 	}
 	if err := findOneResult.Decode(receiver); err != nil {
-		core2.Logger.Warnf("Database unmarshal error: %v", err)
+		core.Logger.Warnf("Database unmarshal error: %v", err)
 		return NewErrorResult(err)
 	}
 	return NewSuccessResult(findOneResult)
@@ -105,7 +105,7 @@ func (s *Service) UpdateOne(subject any, collection *mongo.Collection, ctx conte
 	filter any, options ...*options.UpdateOptions) Result {
 	updateResult, err := collection.UpdateOne(ctx, filter, subject, options...)
 	if err != nil {
-		core2.Logger.Warnf("Database update error: %v", err)
+		core.Logger.Warnf("Database update error: %v", err)
 		return NewErrorResult(err)
 	}
 	return NewSuccessResult(updateResult)
@@ -114,7 +114,7 @@ func (s *Service) UpdateOne(subject any, collection *mongo.Collection, ctx conte
 func (s *Service) UpdateByID(subject any, id any, collection *mongo.Collection, ctx context.Context, options ...*options.UpdateOptions) Result {
 	updateResult, err := collection.UpdateByID(ctx, id, subject, options...)
 	if err != nil {
-		core2.Logger.Warnf("Database update error: %v", err)
+		core.Logger.Warnf("Database update error: %v", err)
 		return NewErrorResult(err)
 	}
 	return NewSuccessResult(updateResult)
@@ -124,7 +124,7 @@ func (s *Service) DeleteOne(collection *mongo.Collection, ctx context.Context, f
 	options ...*options.DeleteOptions) Result {
 	deleteResult, err := collection.DeleteOne(ctx, filter, options...)
 	if err != nil {
-		core2.Logger.Warnf("Database delete error: %v", err)
+		core.Logger.Warnf("Database delete error: %v", err)
 		return NewErrorResult(err)
 	}
 	return NewSuccessResult(deleteResult)

@@ -2,10 +2,10 @@ package plugins
 
 import (
 	"context"
-	core2 "dalian-bot/internal/core"
-	data2 "dalian-bot/internal/services/data"
-	ddtv2 "dalian-bot/internal/services/ddtv"
-	discord2 "dalian-bot/internal/services/discord"
+	"dalian-bot/internal/core"
+	"dalian-bot/internal/services/data"
+	"dalian-bot/internal/services/ddtv"
+	"dalian-bot/internal/services/discord"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,14 +17,14 @@ import (
 )
 
 type DDTVPlugin struct {
-	core2.Plugin
-	DiscordService *discord2.Service
-	DataService    *data2.Service
-	discord2.SlashCommand
-	discord2.IDisrocdHelper
+	core.Plugin
+	DiscordService *discord.Service
+	DataService    *data.Service
+	discord.SlashCommand
+	discord.IDisrocdHelper
 }
 
-func (p *DDTVPlugin) DoNamedInteraction(_ *core2.Bot, i *discordgo.InteractionCreate) (e error) {
+func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (e error) {
 	if isMatched, cmdName := p.DefaultMatchCommand(i); !isMatched {
 		fmt.Printf("nothing matched: %v", i)
 		return nil
@@ -43,7 +43,7 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core2.Bot, i *discordgo.InteractionCr
 						NotifyChannelID:    i.Interaction.ChannelID,
 					})
 					if err != nil {
-						core2.Logger.Warnf("Error inserting webhook channel record: %v", err)
+						core.Logger.Warnf("Error inserting webhook channel record: %v", err)
 						return err
 					}
 					if updateResult.UpsertedCount > 0 {
@@ -54,7 +54,7 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core2.Bot, i *discordgo.InteractionCr
 				case "remove":
 					deleteResult, err := p.deleteOneWebhookNotifyChannel(i.Interaction.ChannelID)
 					if err != nil {
-						core2.Logger.Warnf("Error deleting webhook channel record: %v", err)
+						core.Logger.Warnf("Error deleting webhook channel record: %v", err)
 						return err
 					}
 					if deleteResult.DeletedCount > 0 {
@@ -70,7 +70,7 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core2.Bot, i *discordgo.InteractionCr
 	return nil
 }
 
-func (p *DDTVPlugin) Init(reg *core2.ServiceRegistry) error {
+func (p *DDTVPlugin) Init(reg *core.ServiceRegistry) error {
 	// DiscordService is a MUST have. return error if not found.
 	if err := reg.FetchService(&p.DiscordService); err != nil {
 		return err
@@ -81,7 +81,7 @@ func (p *DDTVPlugin) Init(reg *core2.ServiceRegistry) error {
 	}
 	// ddtvService is not used to perform actions actively in the plugin, so not imported.
 
-	p.AcceptedTriggerTypes = []core2.TriggerType{core2.TriggerTypeDiscord, core2.TriggerTypeDDTV}
+	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord, core.TriggerTypeDDTV}
 	p.Name = "ddtv"
 	p.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
 	p.AppCommandsMap.RegisterCommand(&discordgo.ApplicationCommand{
@@ -114,9 +114,9 @@ Dalian will send a message for every incoming DDTV webhook received in this chan
 Remove current channel from DDTV webhook notification channel list.
 Dalian will no longer send a message for every incoming DDTV webhook received in this channel`
 
-	p.IDisrocdHelper = discord2.GenerateHelper(discord2.HelperConfig{
+	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
 		PluginHelp: "Helper support for Dalian.",
-		CommandHelps: []discord2.CommandHelp{
+		CommandHelps: []discord.CommandHelp{
 			{
 				Name:          "ddtv webhook-channel set",
 				FormattedHelp: formattedHelpSetNotifChannel,
@@ -130,18 +130,18 @@ Dalian will no longer send a message for every incoming DDTV webhook received in
 	return p.DiscordService.RegisterSlashCommand(p)
 }
 
-func (p *DDTVPlugin) Trigger(trigger core2.Trigger) {
+func (p *DDTVPlugin) Trigger(trigger core.Trigger) {
 	if !p.AcceptTrigger(trigger.Type) {
 		return
 	}
 	switch trigger.Type {
-	case core2.TriggerTypeDiscord:
+	case core.TriggerTypeDiscord:
 		// do NOT accept  messageCreate event
 		// do something...
-		dcEvent := discord2.UnboxEvent(trigger)
+		dcEvent := discord.UnboxEvent(trigger)
 		switch dcEvent.EventType {
 		// only accepting interactionCreate for discord trigers
-		case discord2.EventTypeInteractionCreate:
+		case discord.EventTypeInteractionCreate:
 			switch dcEvent.InteractionCreate.Type {
 			case discordgo.InteractionApplicationCommand:
 				// slash command
@@ -154,30 +154,30 @@ func (p *DDTVPlugin) Trigger(trigger core2.Trigger) {
 			// does not handle messageCreate or anything like that.
 			return
 		}
-	case core2.TriggerTypeDDTV:
+	case core.TriggerTypeDDTV:
 		// do ddtv webhook thing
-		webhook := ddtv2.UnboxEvent(trigger).WebHook
+		webhook := ddtv.UnboxEvent(trigger).WebHook
 		// if hooktype is channel, restrict non-record channel message to online.
 		// todo: add a config option to control this behavior
-		if webhook.UserInfo.UID != 0 && !webhook.RoomInfo.IsAutoRec && webhook.Type != ddtv2.HookStartLive {
+		if webhook.UserInfo.UID != 0 && !webhook.RoomInfo.IsAutoRec && webhook.Type != ddtv.HookStartLive {
 			return
 		}
 		p.notifyDDTVWebhookToChannels(webhook)
 	default:
-		core2.Logger.Warnf(core2.LogPromptUnknownTrigger, trigger.Type)
+		core.Logger.Warnf(core.LogPromptUnknownTrigger, trigger.Type)
 	}
 }
 
-func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv2.WebHook) {
+func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv.WebHook) {
 	channelIDs, err := p.findDDTVWebhookNotifyChannels()
 	if err != nil {
-		core2.Logger.Warnf("Retrieve webhook channels failed!: %v", err)
+		core.Logger.Warnf("Retrieve webhook channels failed!: %v", err)
 		return
 	}
 	for _, channelID := range channelIDs {
 		_, err := p.DiscordService.ChannelMessageSendEmbed(channelID, webhook.DigestEmbed())
 		if err != nil {
-			core2.Logger.Warnf("Embed sent failed: %v", err)
+			core.Logger.Warnf("Embed sent failed: %v", err)
 			b, _ := json.Marshal(webhook)
 			p.DiscordService.ChannelMessageSendCodeBlock(channelID, string(b))
 			return
@@ -198,7 +198,7 @@ func (p *DDTVPlugin) getCollection() *mongo.Collection {
 }
 
 func (p *DDTVPlugin) upsertOneWebhookNotifyChannel(po ddtvNotifyPo) (*mongo.UpdateResult, error) {
-	rawResult := p.DataService.UpdateOne(bson.D{{"$set", data2.ToBsonDocForce(po)}}, p.getCollection(), context.Background(), bson.M{"notify_channel_id": po.NotifyChannelID}, options.Update().SetUpsert(true))
+	rawResult := p.DataService.UpdateOne(bson.D{{"$set", data.ToBsonDocForce(po)}}, p.getCollection(), context.Background(), bson.M{"notify_channel_id": po.NotifyChannelID}, options.Update().SetUpsert(true))
 	return rawResult.UpdateResult(), rawResult.Err()
 }
 
@@ -220,10 +220,10 @@ func (p *DDTVPlugin) findDDTVWebhookNotifyChannels() (channels []string, er erro
 
 }
 
-func NewDDTVPlugin(reg *core2.ServiceRegistry) core2.IPlugin {
+func NewDDTVPlugin(reg *core.ServiceRegistry) core.IPlugin {
 	var ddtvPlugin DDTVPlugin
-	if err := (&ddtvPlugin).Init(reg); err != nil && errors.As(err, &core2.ErrServiceFetchUnknownService) {
-		core2.Logger.Panicf("DDTV plugin MUST have all required service(s) injected!")
+	if err := (&ddtvPlugin).Init(reg); err != nil && errors.As(err, &core.ErrServiceFetchUnknownService) {
+		core.Logger.Panicf("DDTV plugin MUST have all required service(s) injected!")
 		panic("DDTV plugin initialization failed.")
 	}
 	return &ddtvPlugin

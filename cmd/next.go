@@ -1,8 +1,8 @@
 package main
 
 import (
-	core2 "dalian-bot/internal/core"
-	plugins2 "dalian-bot/internal/plugins"
+	"dalian-bot/internal/core"
+	"dalian-bot/internal/plugins"
 	"dalian-bot/internal/services/data"
 	"dalian-bot/internal/services/ddtv"
 	"dalian-bot/internal/services/discord"
@@ -16,8 +16,8 @@ import (
 func main() {
 
 	logger, _ := zap.NewDevelopment()
-	core2.Logger = core2.DalianLogger{SugaredLogger: logger.Sugar()}
-	core2.Logger.Infof("Dalian core logger initialized!")
+	core.Logger = core.DalianLogger{SugaredLogger: logger.Sugar()}
+	core.Logger.Infof("Dalian core logger initialized!")
 
 	/* Read Config files */
 	/*
@@ -28,12 +28,12 @@ func main() {
 		}
 
 	*/
-	cred, err := core2.GetCred("config/credentials.yaml")
+	cred, err := core.GetCred("config/credentials.yaml")
 	if err != nil {
 		panic("credential test failed")
 	}
 
-	dalianBot := core2.NewBot()
+	dalianBot := core.NewBot()
 
 	webService := web.Service{ServiceConfig: web.ServiceConfig{TrustedProxies: []string{"165.232.129.202"}}}
 	webService.Init(dalianBot.ServiceRegistry)
@@ -46,11 +46,11 @@ func main() {
 
 	dalianBot.ServiceRegistry.StartAll()
 
-	dalianBot.QuickRegisterPlugin(plugins2.NewPingPlugin)
-	dalianBot.QuickRegisterPlugin(plugins2.NewWhatPlugin)
-	dalianBot.QuickRegisterPlugin(plugins2.NewHelpPlugin)
-	dalianBot.QuickRegisterPlugin(plugins2.NewDDTVPlugin)
-	dalianBot.QuickRegisterPlugin(plugins2.NewArchivePlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewPingPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewWhatPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewHelpPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewDDTVPlugin)
+	dalianBot.QuickRegisterPlugin(plugins.NewArchivePlugin)
 
 	dalianBot.Run()
 	//graceful shutdown
