@@ -1,41 +1,44 @@
 # dalian-bot
 
-Discord bot w/ various housekeeping functions, written in Golang.
+A highly extensible multi-purpose bot w/ various housekeeping functions, written in Golang.
 
 In active development. Powered by [disrord.go](https://github.com/bwmarrin/discordgo) framework.
 
-**🚧Warning🚧**: Reconstruction in progress!!! The new entry point is cmd/next.go. The documentation
-below is *outdated* and will be rewritten in the future.
+Note: As a personal project, dalian-bot presented here may contain multiple plugins highly customized.
+However, you are free to grab it as a bot template for your own project, thanks to the service-plugin system.
 
-## Functions 
+**🚧Warning🚧**: Reconstruction basically done, refining documentation & testing. The new entry point is cmd/next.go.
+
+## Workflow
+
+#### On startup
+* [Entrypoint](cmd/next.go) collects configuration.
+* *Services* are initialized and registered to the *bot*
+* *Plugins* are then wired with *services* and ready.
+
+#### When Running
+* A *service* interacts with external and send *triggers* to the *Bot*.
+* The *bot* dispatches *triggers* to registered *plugins*.
+* Each *plugin* work independently and execute tasks, typically by calling *services* wrapped inside.
+
+## What Dalian can do:
 
 #### Utilities
-* website-archiving (/save-site): Archive given website with tags and notes. 
-  * Scroll archived sites in an interactive way (/list-site)
+* Archive websites (/archive): Archive given website with tags and notes. 
+  * Scroll archived sites in an interactive way , modify and delete existing records.
   * A snapshot is generated and stored into onedrive (in dev)
   * Automatically store *every* website in the given channel (in dev)
+* Help messages (/help, $help): Display help messages for commands, if supported by plugin.
+* DDTV Webhook Notification (/ddtv): Parse webhook messages coming from [DDTV](https://github.com/CHKZL/DDTV),
+a bilibili live-stream recorder, and display in a reasonable way.
 
 #### For fun
-* **WHAT** (what): repeat the last message with bold font
+* **What** : **WHAT**
 
 
-## Directory struct
+## Configuration
 
-### Code directory
+A config-generator is working in progress, For now, you can manually save your config file (credentials.yaml)
+at config/credentials.yaml following the format.
 
-1. pkg
-   1. clients: lower-level clients for intereaction
-   2. commands: everything about discord commands.
-      1. model.go: where you'll find all interfaces & struct definitions.
-      2. setup.go: in charge of registering handlers to DiscordGo framework.
-   3. data: wrapper for mongoDB interactions
-   4. discord: wrapper for discord interactions.
-   5. lifecycle.go: very self-explanatory.
-2. main.go: entry function.
 
-### Non-code directories
-parallel to the executable file.
-1. config: storing configurations for the bot.
-   1. credentials.yaml: see credentials_format.yaml
-2. static: storing permanent static files other than config, usually for testing & testing command
-purposes.

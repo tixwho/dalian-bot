@@ -15,6 +15,10 @@ func (s *Service) ChannelMessageSend(channelID, content string) (*discordgo.Mess
 	return s.Session.ChannelMessageSend(channelID, content)
 }
 
+func (s *Service) ChannelMessageSendCodeBlock(channelID, content string) (*discordgo.Message, error) {
+	return s.Session.ChannelMessageSend(channelID, fmt.Sprintf("```\r%s\r```", content))
+}
+
 // ChannelMessageSendEmbed A wrapper of discordgo ChannelMessageSendEmbed function.
 func (s *Service) ChannelMessageSendEmbed(channelID string, embed *discordgo.MessageEmbed) (*discordgo.Message, error) {
 	return s.Session.ChannelMessageSendEmbed(channelID, embed)

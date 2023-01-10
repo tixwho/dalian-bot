@@ -25,6 +25,8 @@ type Bot struct {
 	ServiceRegistry *ServiceRegistry // ServiceRegistry A Service provider maintained by Bot
 	PluginRegistry  *PluginRegistry  // PluginRegistry A Plugin provider maintained by Bot
 	DispatcherChan  <-chan Trigger   // DispatcherChan channel for dispatching Trigger to Plugin
+
+	//todo: add a channel that listening to auditing messages, or add an AuditService in Bot
 }
 
 func NewBot() *Bot {

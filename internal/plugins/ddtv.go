@@ -6,6 +6,7 @@ import (
 	data2 "dalian-bot/internal/services/data"
 	ddtv2 "dalian-bot/internal/services/ddtv"
 	discord2 "dalian-bot/internal/services/discord"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/bwmarrin/discordgo"
@@ -155,13 +156,13 @@ func (p *DDTVPlugin) Trigger(trigger core2.Trigger) {
 		}
 	case core2.TriggerTypeDDTV:
 		// do ddtv webhook thing
-		ddtvEvent := ddtv2.UnboxEvent(trigger)
 		webhook := ddtv2.UnboxEvent(trigger).WebHook
 		// if hooktype is channel, restrict non-record channel message to online.
+		// todo: add a config option to control this behavior
 		if webhook.UserInfo.UID != 0 && !webhook.RoomInfo.IsAutoRec && webhook.Type != ddtv2.HookStartLive {
 			return
 		}
-		p.notifyDDTVWebhookToChannels(ddtvEvent.WebHook)
+		p.notifyDDTVWebhookToChannels(webhook)
 	default:
 		core2.Logger.Warnf(core2.LogPromptUnknownTrigger, trigger.Type)
 	}
@@ -177,6 +178,8 @@ func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv2.WebHook) {
 		_, err := p.DiscordService.ChannelMessageSendEmbed(channelID, webhook.DigestEmbed())
 		if err != nil {
 			core2.Logger.Warnf("Embed sent failed: %v", err)
+			b, _ := json.Marshal(webhook)
+			p.DiscordService.ChannelMessageSendCodeBlock(channelID, string(b))
 			return
 		}
 	}

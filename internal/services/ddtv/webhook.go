@@ -121,6 +121,8 @@ type RoomInfo struct {
 	Sign               string             `json:"sign,omitempty"`
 	DownloadedFileInfo DownloadedFileInfo `json:"DownloadedFileInfo,omitempty"`
 	Shell              string             `json:"Shell,omitempty"`
+	//Testing
+	TypeName string `json:"type_name,omitempty"`
 }
 
 type DownloadedFileInfo struct {
@@ -194,4 +196,5 @@ const (
 	HookLoginFailure
 	HookLoginWillExpireSoon
 	HookUpdateAvailable
+	//Todo: Add HookShellExecutionComplete
 )
