@@ -5,6 +5,7 @@ import (
 	"reflect"
 )
 
+// PluginRegistry Plugin controller embedded in the Bot.
 type PluginRegistry struct {
 	plugins     map[reflect.Type]IPlugin
 	pluginTypes []reflect.Type
@@ -45,6 +46,7 @@ func (p *Plugin) GetName() string {
 	return p.Name
 }
 
+// AcceptTrigger Return if the Plugin accept certain type of Trigger.
 func (p *Plugin) AcceptTrigger(t TriggerType) bool {
 	for _, acceptedType := range p.AcceptedTriggerTypes {
 		if t == acceptedType {
@@ -61,6 +63,6 @@ type IPlugin interface {
 	GetName() string                  // provided by Plugin
 	AcceptTrigger(t TriggerType) bool // provided by Plugin
 
-	Init(reg *ServiceRegistry) error
-	Trigger(trigger Trigger)
+	Init(reg *ServiceRegistry) error // should be implemented
+	Trigger(trigger Trigger)         // should be implemented.
 }

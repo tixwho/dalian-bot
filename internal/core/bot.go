@@ -24,7 +24,7 @@ type DalianLogger struct {
 type Bot struct {
 	ServiceRegistry *ServiceRegistry // ServiceRegistry A Service provider maintained by Bot
 	PluginRegistry  *PluginRegistry  // PluginRegistry A Plugin provider maintained by Bot
-	DispatcherChan  <-chan Trigger   // DispatcherChan channel for dispatching Trigger to Plugin
+	DispatcherChan  chan Trigger     // DispatcherChan channel for dispatching Trigger to Plugin
 
 	//todo: add a channel that listening to auditing messages, or add an AuditService in Bot
 }
@@ -37,17 +37,19 @@ func NewBot() *Bot {
 	return bot
 }
 
+// Run start the bot and listen to incoming events.
 func (b *Bot) Run() {
 	b.DispatcherChan, _ = b.ServiceRegistry.InstallTriggerChanForAll()
+	//loop until channel closed.
 	go func(ch <-chan Trigger) {
 		for {
 			if trigger, ok := <-ch; !ok {
 				//channel closed
 				return
 			} else {
-				//receives a trigger, dispatching...
+				// receives a trigger, dispatching...
 				Logger.Debugf("trigger:%v", trigger)
-				trigger.Bot = b //injecting bot object
+				trigger.Bot = b //inject bot instance to Trigger.
 				for _, plugin := range b.PluginRegistry.GetPlugins() {
 					go plugin.Trigger(trigger)
 				}
@@ -56,6 +58,7 @@ func (b *Bot) Run() {
 	}(b.DispatcherChan)
 }
 
+// QuickRegisterPlugin a shortcut for initialize and register a plugin to bot.
 func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) IPlugin) error {
 	plugin := f(b.ServiceRegistry)
 	return b.PluginRegistry.RegisterPlugin(plugin)
@@ -63,9 +66,11 @@ func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) IPlugin) error {
 
 func (b *Bot) GracefulShutDown() {
 	Logger.Infof("Received termination signal...")
-	b.ServiceRegistry.StopAll()
+	close(b.DispatcherChan)     // close trigger channel
+	b.ServiceRegistry.StopAll() // stop all services.
 }
 
+// MessengerConfig Basic config for messenger, records command prefix, separator, and botID.
 type MessengerConfig struct {
 	Prefix    string
 	Separator string

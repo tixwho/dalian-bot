@@ -9,7 +9,7 @@ import (
 )
 
 // PingPlugin Basic ping support.
-// Discord: can be trigggered by $ping, /ping
+// Discord: can be trigggered by `$ping`, `/ping`
 type PingPlugin struct {
 	core.Plugin
 	DiscordService *discord.Service

@@ -46,9 +46,10 @@ func (wh WebHook) DigestEmbed() *discordgo.MessageEmbed {
 			URL:  "https://ddtv.pro",
 			Name: "DDTV",
 		},
-		Image: &discordgo.MessageEmbedImage{
-			URL: wh.RoomInfo.CoverFromUser,
-		},
+		// can be empty
+		//Image: &discordgo.MessageEmbedImage{
+		//	URL: wh.RoomInfo.CoverFromUser,
+		//},
 		Timestamp: time.Now().Format(time.RFC3339),
 		Color:     discord.EmbedColorNormal,
 		URL:       fmt.Sprintf("https://live.bilibili.com/%d", wh.RoomInfo.RoomID),
@@ -58,6 +59,13 @@ func (wh WebHook) DigestEmbed() *discordgo.MessageEmbed {
 			Inline: false,
 		}},
 	}
+
+	if wh.RoomInfo.CoverFromUser != "" {
+		embed.Image = &discordgo.MessageEmbedImage{
+			URL: wh.RoomInfo.CoverFromUser,
+		}
+	}
+
 	return embed
 }
 
@@ -163,7 +171,7 @@ func (h HookType) MessagePrompt(username string, uid int) string {
 	case HookSaveGuardComplete:
 		return fmt.Sprintf("DDTV completes saving guard info for live channel %s[%d].", username, uid)
 	case HookRunShellComplete:
-		return fmt.Sprintf("DDTV completes a shell task for live channel %s[%d].", username, uid)
+		return fmt.Sprintf("DDTV starts a shell task for live channel %s[%d].", username, uid)
 	case HookDownloadEndMissionSuccess:
 		return fmt.Sprintf("DDTV completes a download task for live channel %s[%d].", username, uid)
 	case HookSpaceIsInsufficientWarn:
@@ -174,6 +182,8 @@ func (h HookType) MessagePrompt(username string, uid int) string {
 		return "DDTV login will expire soon!!"
 	case HookUpdateAvailable:
 		return "A new version of DDTV is available. Please update asap."
+	case HookShellExecutionComplete:
+		return fmt.Sprintf("Live channel %s[%d] hook successfully executed.", username, uid)
 	default:
 		return fmt.Sprintf("Unknown Hook Type: %s", reflect.TypeOf(h))
 	}
@@ -196,5 +206,5 @@ const (
 	HookLoginFailure
 	HookLoginWillExpireSoon
 	HookUpdateAvailable
-	//Todo: Add HookShellExecutionComplete
+	HookShellExecutionComplete
 )

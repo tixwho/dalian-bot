@@ -8,6 +8,7 @@ import (
 	"sync"
 )
 
+// ServiceRegistry Servcice controller embedded in the Bot.
 type ServiceRegistry struct {
 	services     map[reflect.Type]Service
 	serviceTypes []reflect.Type
@@ -39,7 +40,7 @@ func (s *ServiceRegistry) StartAll() {
 	Logger.Infof("Finished starting all service! Services online now: %v", s.serviceTypes)
 }
 
-func (s *ServiceRegistry) InstallTriggerChanForAll() (ch <-chan Trigger, err error) {
+func (s *ServiceRegistry) InstallTriggerChanForAll() (ch chan Trigger, err error) {
 	triggerChan := make(chan Trigger, 100)
 	for _, kind := range s.services {
 		if triggerable, canTrigger := kind.(ITrigggerable); canTrigger {
@@ -85,6 +86,7 @@ var (
 	ErrServiceFetchUnknownService = errors.New("service not found in registry")
 )
 
+// Service Top-level service interface.
 type Service interface {
 	Name() string
 	Init(reg *ServiceRegistry) error

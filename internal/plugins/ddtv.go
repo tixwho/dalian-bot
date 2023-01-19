@@ -16,6 +16,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// DDTVPlugin Receives DDTV Webhook and notify in channel
+// Discord: related command can be found under command group of `ddtv`
 type DDTVPlugin struct {
 	core.Plugin
 	DiscordService *discord.Service

@@ -9,6 +9,8 @@ import (
 	"regexp"
 )
 
+// WhatPlugin A for-fun function that will repeat the last message.
+// Discord: Can be triggered by `what`
 type WhatPlugin struct {
 	core.Plugin
 	DiscordService *discord.Service

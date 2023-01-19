@@ -9,7 +9,7 @@ import (
 )
 
 // HelpPlugin Plugin for collecting help info of registered commands.
-// For Discord: can be triggered by $help or /help
+// Discord: can be triggered by `$help` or `/help`
 type HelpPlugin struct {
 	core.Plugin                              // basic plugin basetype
 	DiscordService          *discord.Service // currently support discord

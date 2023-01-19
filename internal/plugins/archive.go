@@ -16,6 +16,8 @@ import (
 	"time"
 )
 
+// ArchivePlugin Create archives for specific contents.
+// Discord: Related commands are stored in command group `archive`
 type ArchivePlugin struct {
 	core.Plugin
 	DiscordService *discord.Service
