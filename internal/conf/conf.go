@@ -1,6 +1,7 @@
-package core
+package conf
 
 import (
+	"dalian-bot/internal/core"
 	"gopkg.in/yaml.v3"
 	"os"
 )
@@ -31,12 +32,12 @@ func GetCred(fileLocation string) (*Cred, error) {
 	if credInternal.Version == "" {
 		yamlFile, err := os.ReadFile(fileLocation)
 		if err != nil {
-			Logger.Panicf("Error reading cred file from [%s]: %v", fileLocation, err)
+			core.Logger.Panicf("Error reading cred file from [%s]: %v", fileLocation, err)
 			return nil, err
 		}
 		err = yaml.Unmarshal(yamlFile, &credInternal)
 		if err != nil {
-			Logger.Panicf("Error unmarshalling cred file: %v", err)
+			core.Logger.Panicf("Error unmarshalling cred file: %v", err)
 			return nil, err
 		}
 	}

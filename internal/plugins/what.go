@@ -44,7 +44,7 @@ func (p *WhatPlugin) Init(reg *core.ServiceRegistry) error {
 		return err
 	}
 
-	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord}
+	p.AcceptedTriggerTypes = []core.TriggerType{discord.TriggerTypeDiscord}
 	p.Name = "what"
 	p.RegexExpressions = []*regexp.Regexp{regexp.MustCompile("^what$")}
 	return nil

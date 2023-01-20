@@ -50,7 +50,7 @@ func (p *PingPlugin) Init(reg *core.ServiceRegistry) error {
 		return err
 	}
 
-	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord}
+	p.AcceptedTriggerTypes = []core.TriggerType{discord.TriggerTypeDiscord}
 	p.Name = "ping"
 	p.Identifiers = []string{"ping"}
 	p.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)

@@ -162,7 +162,7 @@ func (s *Service) Name() string {
 
 func (s *Service) messageCreate(_ *discordgo.Session, m *discordgo.MessageCreate) {
 	t := core.Trigger{
-		Type: core.TriggerTypeDiscord,
+		Type: TriggerTypeDiscord,
 		Event: Event{
 			EventType:     EventTypeMessageCreate,
 			MessageCreate: m,
@@ -175,7 +175,7 @@ func (s *Service) interactionCreate(_ *discordgo.Session, i *discordgo.Interacti
 	//debugging
 	fmt.Printf("Int: %s:%s:%v \r\n", i.Member.User.Username, i.Data, i.Message)
 	t := core.Trigger{
-		Type: core.TriggerTypeDiscord,
+		Type: TriggerTypeDiscord,
 		Event: Event{
 			EventType:         EventTypeInteractionCreate,
 			InteractionCreate: i,

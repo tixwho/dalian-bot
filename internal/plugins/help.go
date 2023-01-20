@@ -84,7 +84,7 @@ func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
 	if err := reg.FetchService(&p.DiscordService); err != nil {
 		return err
 	}
-	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord}
+	p.AcceptedTriggerTypes = []core.TriggerType{discord.TriggerTypeDiscord}
 	p.Name = "help"
 	p.Identifiers = []string{"help"}
 	p.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)

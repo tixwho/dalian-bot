@@ -83,7 +83,7 @@ func (p *DDTVPlugin) Init(reg *core.ServiceRegistry) error {
 	}
 	// ddtvService is not used to perform actions actively in the plugin, so not imported.
 
-	p.AcceptedTriggerTypes = []core.TriggerType{core.TriggerTypeDiscord, core.TriggerTypeDDTV}
+	p.AcceptedTriggerTypes = []core.TriggerType{discord.TriggerTypeDiscord, ddtv.TriggerTypeDDTV}
 	p.Name = "ddtv"
 	p.AppCommandsMap = make(map[string]*discordgo.ApplicationCommand)
 	p.AppCommandsMap.RegisterCommand(&discordgo.ApplicationCommand{
@@ -137,7 +137,7 @@ func (p *DDTVPlugin) Trigger(trigger core.Trigger) {
 		return
 	}
 	switch trigger.Type {
-	case core.TriggerTypeDiscord:
+	case discord.TriggerTypeDiscord:
 		// do NOT accept  messageCreate event
 		// do something...
 		dcEvent := discord.UnboxEvent(trigger)
@@ -156,7 +156,7 @@ func (p *DDTVPlugin) Trigger(trigger core.Trigger) {
 			// does not handle messageCreate or anything like that.
 			return
 		}
-	case core.TriggerTypeDDTV:
+	case ddtv.TriggerTypeDDTV:
 		// do ddtv webhook thing
 		webhook := ddtv.UnboxEvent(trigger).WebHook
 		// if hooktype is channel, restrict non-record channel message to online.

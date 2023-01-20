@@ -74,7 +74,7 @@ func (s *Service) handleWebhook(c *gin.Context) {
 	}
 	c.Status(http.StatusOK)
 	t := core.Trigger{
-		Type: core.TriggerTypeDDTV,
+		Type: TriggerTypeDDTV,
 		Event: Event{
 			EventType: EventTypeWebhook,
 			WebHook:   hook,

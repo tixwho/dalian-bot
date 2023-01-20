@@ -10,14 +10,16 @@ import (
 
 // ServiceRegistry Servcice controller embedded in the Bot.
 type ServiceRegistry struct {
-	services     map[reflect.Type]Service
-	serviceTypes []reflect.Type
+	services     map[reflect.Type]Service // store service instances
+	serviceTypes []reflect.Type           // record service register orders.
 }
 
+// NewServiceRegistry Return a raw ServiceRegistry
 func NewServiceRegistry() *ServiceRegistry {
 	return &ServiceRegistry{services: make(map[reflect.Type]Service)}
 }
 
+// RegisterService Register a service to registry.
 func (s *ServiceRegistry) RegisterService(service Service) error {
 	kind := reflect.TypeOf(service)
 	if _, exists := s.services[kind]; exists {
@@ -28,6 +30,7 @@ func (s *ServiceRegistry) RegisterService(service Service) error {
 	return nil
 }
 
+// StartAll Run all registered services in separated goroutines.
 func (s *ServiceRegistry) StartAll() {
 	Logger.Debugf("Starting %d services: %v\r\n", len(s.serviceTypes), s.serviceTypes)
 	wg := sync.WaitGroup{}
@@ -40,10 +43,11 @@ func (s *ServiceRegistry) StartAll() {
 	Logger.Infof("Finished starting all service! Services online now: %v", s.serviceTypes)
 }
 
+// InstallTriggerChanForAll Install main Trigger channel for all Services that are able to send Triggers.
 func (s *ServiceRegistry) InstallTriggerChanForAll() (ch chan Trigger, err error) {
 	triggerChan := make(chan Trigger, 100)
 	for _, kind := range s.services {
-		if triggerable, canTrigger := kind.(ITrigggerable); canTrigger {
+		if triggerable, canTrigger := kind.(Trigggerable); canTrigger {
 			triggerable.InstallTriggerChan(triggerChan)
 		}
 	}
@@ -95,27 +99,28 @@ type Service interface {
 	Status() error
 }
 
+// TriggerType Unique TriggerType, services use them to identify trigger options.
 type TriggerType string
 
-const (
-	TriggerTypeDDTV    TriggerType = "ddtv"
-	TriggerTypeDiscord             = "discord"
-)
-
+// Trigger An event that request bot responses.
+// Typically consumed by registered Plugin for further analysis.
 type Trigger struct {
 	Type  TriggerType
 	Bot   *Bot
 	Event any //deligate to services for deref
 }
 
-type ITrigggerable interface {
+// Trigggerable An interface that represent structs able to send triggers.
+type Trigggerable interface {
 	InstallTriggerChan(chan<- Trigger)
 }
 
+// TriggerableEmbedUtil An util that stores trigger channel.
 type TriggerableEmbedUtil struct {
 	TriggerChan chan<- Trigger
 }
 
+// InstallTriggerChan Install the given Trigger channel
 func (t *TriggerableEmbedUtil) InstallTriggerChan(triggers chan<- Trigger) {
 	t.TriggerChan = triggers
 }

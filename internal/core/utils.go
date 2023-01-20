@@ -8,14 +8,13 @@ import (
 	"sync"
 )
 
-// StartWithMatchUtil Text command triggers when a specific text is detected, the most common type of command
-// start with global identifier, have one or more arguments
+// StartWithMatchUtil Provides start-with match utilities
 type StartWithMatchUtil struct {
 	Identifiers []string
 }
 
-// MatchText Embedded match method for StartWithMatchUtil
-func (cm *StartWithMatchUtil) MatchText(content string, config MessengerConfig) (bool, string) {
+// MatchText Match a string with given identifiers
+func (cm *StartWithMatchUtil) MatchText(content string, config MessengerConfig) (isMatched bool, which string) {
 	for _, v := range cm.Identifiers {
 		//must be a perfect match before the first space
 		if strings.TrimSpace(strings.Split(content, " ")[0]) == config.Prefix+v {
@@ -25,15 +24,13 @@ func (cm *StartWithMatchUtil) MatchText(content string, config MessengerConfig) 
 	return false, ""
 }
 
-// RegexMatchUtil Complicated TextCommand, using Regex to match
-// Grants possibility of NOT using identifiers and perform advanced macthing actions.
-// embeds one or multiple regex expression(s) for matching purposes.
+// RegexMatchUtil Provides regex match utilities
 type RegexMatchUtil struct {
 	RegexExpressions []*regexp.Regexp
 }
 
-// RegMatchMessage Embedded match method for RegexMatchUtil
-func (cm *RegexMatchUtil) RegMatchMessage(content string) (bool, regexp.Regexp) {
+// RegMatchMessage Match a string with given regex expressions
+func (cm *RegexMatchUtil) RegMatchMessage(content string) (isMatched bool, which regexp.Regexp) {
 	for _, reg := range cm.RegexExpressions {
 		if reg.MatchString(content) {
 			return true, *reg
@@ -42,13 +39,12 @@ func (cm *RegexMatchUtil) RegMatchMessage(content string) (bool, regexp.Regexp) 
 	return false, regexp.Regexp{}
 }
 
-// ArgParseUtil Text commands with multiple arguments
-// embeds a default splitting method for multiple args
+// ArgParseUtil Provides linux-like argument parsing utilities
 type ArgParseUtil struct {
 }
 
-// SeparateArgs separate a long string into different args
-// when no extra args provided, the string shoud len(1)
+// SeparateArgs Separate a long string into different args
+// When no extra args provided, the string shoud len(1)
 func (cm *ArgParseUtil) SeparateArgs(content, separator string) []string {
 	args := strings.Split(content, separator)
 	j := 0
@@ -63,7 +59,7 @@ func (cm *ArgParseUtil) SeparateArgs(content, separator string) []string {
 	return args
 }
 
-// CommandFlag basic structure for handling command flags
+// CommandFlag Basic structure for handling command flags
 type CommandFlag struct {
 	Name             string   // Flag name
 	FlagPrefix       []string // Flag prefix(s)
@@ -72,7 +68,8 @@ type CommandFlag struct {
 	MEGroup          []string // Mutually exclusive group
 }
 
-// FlagParseUtil Text commands enabling linux flag-like inputs
+// FlagParseUtil Provides complicated linux-like flag-parsing utilities
+// Need to setup AvailableFlagMap first.
 type FlagParseUtil struct {
 	// FlagArgstatMaps: flag name : ?args required
 	AvailableFlagMap map[string]*CommandFlag
@@ -140,7 +137,6 @@ func (cm *FlagParseUtil) ValidateFlagMap(flagMaps FlagArgstatMaps) (FlagArgstatM
 				return nil, fmt.Errorf("flag [%s] does NOT allow ANY extra argument", entry.Name)
 			}
 			//checking number of extra arg allowed
-			//i
 			if !entry.MultipleExtraArg && len(priExtra) > 1 {
 				return nil, fmt.Errorf("flag [%s] allow exactly ONE extra argument", entry.Name)
 			}
@@ -203,33 +199,40 @@ func tryInsertFlagMap(kvPair [2]string, flagMap FlagArgstatMaps) {
 	}
 }
 
-type StageMap map[CombinedKey]IStage
+// StageMap A map structure for wrapping stages (often time-limited)
+type StageMap map[CombinedKey]Stage
 
+// StageUtil Provides stage utilities, with an RWMutex.
 type StageUtil struct {
 	*sync.RWMutex
 	StageMap
 }
 
-func (su *StageUtil) GetStage(key CombinedKey) (stage IStage, found bool) {
+// GetStage Get a Stage, thread-safe.
+func (su *StageUtil) GetStage(key CombinedKey) (stage Stage, found bool) {
 	su.RLock()
 	defer su.RUnlock()
 	v, ok := su.StageMap[key]
 	return v, ok
 }
 
-func (su *StageUtil) StoreStage(key CombinedKey, stage IStage) {
+// StoreStage Store a Stage, thread-safe.
+func (su *StageUtil) StoreStage(key CombinedKey, stage Stage) {
 	su.Lock()
 	defer su.Unlock()
 	su.StageMap[key] = stage
 }
 
+// DeleteStage Delete a Stage, thread-safe.
 func (su *StageUtil) DeleteStage(key CombinedKey) {
 	su.Lock()
 	defer su.Unlock()
 	delete(su.StageMap, key)
 }
 
-func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value IStage) (stopIter bool)) {
+// IterThroughStage Apply the closure to the stage, thread-safe, modification within loop allowed.
+// The closure should return true as a sign of loop break.
+func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value Stage) (stopIter bool)) {
 	su.RLock()
 	defer su.RUnlock()
 	for k, v := range su.StageMap {
@@ -242,16 +245,18 @@ func (su *StageUtil) IterThroughStage(f func(key CombinedKey, value IStage) (sto
 	}
 }
 
+// NewStageUtil return a new StageUtil.
 func NewStageUtil() StageUtil {
 	return StageUtil{&sync.RWMutex{}, make(StageMap)}
 }
 
-// IStage IStage represent those structs carrying states.
+// Stage Stage represent those structs carrying states.
 // Often used for timeout methods.
-type IStage interface {
+type Stage interface {
 	Process(t any)
 }
 
+// PagerAction represent action for pagers.
 type PagerAction int
 
 const (
@@ -259,16 +264,14 @@ const (
 	PagerNextPage
 )
 
+// CombinedKey a simple wrapper for key combination.
 type CombinedKey string
 
+// CombinedKeyFromRaw combine multiple strings into a single key.
+// It is recommended to do another wrap in plugins.
 func CombinedKeyFromRaw(args ...string) CombinedKey {
 	tempKey := strings.Join(args, "-")
 	return CombinedKey(tempKey)
-}
-
-type ICacheCommand interface {
-	RefreshAllCache() error
-	RefreshCache(cacheIdentifier string) error
 }
 
 type CacheUtil struct {

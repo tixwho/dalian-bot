@@ -29,6 +29,7 @@ type Bot struct {
 	//todo: add a channel that listening to auditing messages, or add an AuditService in Bot
 }
 
+// NewBot prepare a bot template to be filled.
 func NewBot() *Bot {
 	bot := &Bot{
 		ServiceRegistry: NewServiceRegistry(),
@@ -64,6 +65,7 @@ func (b *Bot) QuickRegisterPlugin(f func(reg *ServiceRegistry) IPlugin) error {
 	return b.PluginRegistry.RegisterPlugin(plugin)
 }
 
+// GracefulShutDown close all services before shutdown.
 func (b *Bot) GracefulShutDown() {
 	Logger.Infof("Received termination signal...")
 	close(b.DispatcherChan)     // close trigger channel

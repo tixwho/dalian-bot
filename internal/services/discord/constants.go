@@ -1,5 +1,7 @@
 package discord
 
+import "dalian-bot/internal/core"
+
 const (
 	EmbedColorNormal   = 0x33acff
 	EmbedColorQuestion = 0xffcb66
@@ -11,3 +13,5 @@ const (
 	EmojiLeftArrow  = "\u2B05"
 	EmojiRightArrow = "\u27A1"
 )
+
+const TriggerTypeDiscord core.TriggerType = "discord"

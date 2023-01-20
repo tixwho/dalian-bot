@@ -224,7 +224,7 @@ func (p *ArchivePlugin) handleRemoveSite(i *discordgo.Interaction, optionsMap ma
 func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.CombinedKey {
 	var key core.CombinedKey
 	var latestTime time.Time
-	p.StageUtil.IterThroughStage(func(k core.CombinedKey, v core.IStage) bool {
+	p.StageUtil.IterThroughStage(func(k core.CombinedKey, v core.Stage) bool {
 
 		if aqs, ok := (v).(*archiveQueryStage); ok {
 			if aqs.OwnerUserID == i.Member.User.ID && aqs.ChannelID == i.ChannelID {
@@ -237,6 +237,10 @@ func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.Comb
 		return false
 	})
 	return key
+}
+
+func (p *ArchivePlugin) getPagerKey(pagerMessageID string) core.CombinedKey {
+	return core.CombinedKeyFromRaw(pagerMessageID)
 }
 
 func (p *ArchivePlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (err error) {
@@ -277,7 +281,7 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 	// core plugin type
 	p.Plugin = core.Plugin{
 		Name:                 "archive",
-		AcceptedTriggerTypes: []core.TriggerType{core.TriggerTypeDiscord},
+		AcceptedTriggerTypes: []core.TriggerType{discord.TriggerTypeDiscord},
 	}
 	// utils
 	p.ArgParseUtil = core.ArgParseUtil{}
@@ -460,7 +464,7 @@ func (p *ArchivePlugin) Trigger(trigger core.Trigger) {
 			}
 		case discordgo.InteractionMessageComponent:
 			// message component (pager)
-			if stage, ok := p.StageUtil.GetStage(core.CombinedKeyFromRaw(discordEvent.InteractionCreate.Message.ID)); ok {
+			if stage, ok := p.StageUtil.GetStage(p.getPagerKey(discordEvent.InteractionCreate.Message.ID)); ok {
 				stage.Process(discordEvent.InteractionCreate.Interaction)
 			}
 		default:
@@ -593,7 +597,7 @@ func (a *archiveQueryStage) Init(pager *discord.Pager, plugin *ArchivePlugin) {
 	a.CreatedTime = time.Now()
 	a.triggerChan = make(chan *discordgo.Interaction, 1)
 	a.plugin = plugin
-	key := core.CombinedKeyFromRaw(pager.AttachedMessage.ID)
+	key := a.plugin.getPagerKey(pager.AttachedMessage.ID)
 	go func() {
 		plugin.StageUtil.StoreStage(key, a)
 		func() {

@@ -7,14 +7,16 @@ import (
 
 // PluginRegistry Plugin controller embedded in the Bot.
 type PluginRegistry struct {
-	plugins     map[reflect.Type]IPlugin
-	pluginTypes []reflect.Type
+	plugins     map[reflect.Type]IPlugin // store valid plugin instances
+	pluginTypes []reflect.Type           // record plguin regsitration order
 }
 
+// NewPluginRegistry Return a raw PluginRegistry
 func NewPluginRegistry() *PluginRegistry {
 	return &PluginRegistry{plugins: make(map[reflect.Type]IPlugin)}
 }
 
+// RegisterPlugin Register plugin to registry.
 func (s *PluginRegistry) RegisterPlugin(plugin IPlugin) error {
 	kind := reflect.TypeOf(plugin)
 	if _, exists := s.plugins[kind]; exists {
@@ -26,13 +28,9 @@ func (s *PluginRegistry) RegisterPlugin(plugin IPlugin) error {
 	return nil
 }
 
+// GetPlugins Get all plugins registered.
 func (s *PluginRegistry) GetPlugins() map[reflect.Type]IPlugin {
 	return s.plugins
-}
-
-// ILateInitCommand For commands that need a late init process in lifecycle (i.g.) database
-type ILateInitCommand interface {
-	LateInit()
 }
 
 // Plugin Basic command struct with no function
