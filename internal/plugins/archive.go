@@ -22,7 +22,7 @@ type ArchivePlugin struct {
 	core.Plugin
 	DiscordService *discord.Service
 	DataService    *data.Service
-	discord.SlashCommand
+	discord.SlashCommandUtil
 	discord.IDisrocdHelper
 	core.ArgParseUtil
 	core.StageUtil
@@ -239,6 +239,7 @@ func (p *ArchivePlugin) findActiveRelativeID(i *discordgo.Interaction) core.Comb
 	return key
 }
 
+// getPagerKey the key to identify discord pager stages in this plugin is pagerMessageID.
 func (p *ArchivePlugin) getPagerKey(pagerMessageID string) core.CombinedKey {
 	return core.CombinedKeyFromRaw(pagerMessageID)
 }
@@ -288,7 +289,7 @@ func (p *ArchivePlugin) Init(reg *core.ServiceRegistry) error {
 	p.StageUtil = core.NewStageUtil()
 
 	// discord
-	p.SlashCommand = discord.SlashCommand{AppCommandsMap: map[string]*discordgo.ApplicationCommand{}}
+	p.SlashCommandUtil = discord.SlashCommandUtil{AppCommandsMap: map[string]*discordgo.ApplicationCommand{}}
 	p.AppCommandsMap.RegisterCommand(&discordgo.ApplicationCommand{
 		Name:        "archive",
 		Description: "archive certain things",

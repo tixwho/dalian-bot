@@ -11,12 +11,12 @@ import (
 // HelpPlugin Plugin for collecting help info of registered commands.
 // Discord: can be triggered by `$help` or `/help`
 type HelpPlugin struct {
-	core.Plugin                              // basic plugin basetype
-	DiscordService          *discord.Service // currently support discord
-	core.StartWithMatchUtil                  // plain message support
-	core.ArgParseUtil                        // command argument support
-	discord.SlashCommand                     // discord slash command support
-	discord.IDisrocdHelper                   // the plugin itself needs to display help texts.
+	core.Plugin                               // basic plugin basetype
+	DiscordService           *discord.Service // currently support discord
+	core.StartWithMatchUtil                   // plain message support
+	core.ArgParseUtil                         // command argument support
+	discord.SlashCommandUtil                  // discord slash command support
+	discord.IDisrocdHelper                    // the plugin itself needs to display help texts.
 }
 
 // DoNamedInteraction `/help [command-name]` support
@@ -66,8 +66,8 @@ func parseHelpText(b *core.Bot, commandName string) string {
 	return helpText
 }
 
-// DoMessage `$help [command-name]` support
-func (p *HelpPlugin) DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err error) {
+// DoPlainMessage `$help [command-name]` support
+func (p *HelpPlugin) DoPlainMessage(b *core.Bot, m *discordgo.MessageCreate) (err error) {
 	if matched, _ := p.StartWithMatchUtil.MatchText(m.Content, p.DiscordService.DiscordAccountConfig); matched {
 		args := p.ArgParseUtil.SeparateArgs(m.Content, p.DiscordService.DiscordAccountConfig.Separator)
 		if len(args) == 1 {
@@ -110,7 +110,7 @@ Display the help message.
 If command-name not provided, list the names of all available commands; Otherwise, provide detailed explaination of the specific command.`,
 		p.DiscordService.DiscordAccountConfig.Prefix)
 	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
-		PluginHelp: "Helper support for Dalian.",
+		PluginHelp: "HelperUtil support for Dalian.",
 		CommandHelps: []discord.CommandHelp{
 			{
 				Name:          "help",
@@ -131,7 +131,7 @@ func (p *HelpPlugin) Trigger(trigger core.Trigger) {
 		if p.DiscordService.IsGuildMessageFromBotOrSelf(discordEvent.MessageCreate.Message) {
 			return
 		}
-		p.DoMessage(trigger.Bot, discordEvent.MessageCreate)
+		p.DoPlainMessage(trigger.Bot, discordEvent.MessageCreate)
 	case discord.EventTypeInteractionCreate:
 		p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate)
 	default:

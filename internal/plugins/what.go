@@ -17,7 +17,7 @@ type WhatPlugin struct {
 	core.RegexMatchUtil
 }
 
-func (p *WhatPlugin) DoMessage(_ *core.Bot, m *discordgo.MessageCreate) (err error) {
+func (p *WhatPlugin) DoPlainMessage(_ *core.Bot, m *discordgo.MessageCreate) (err error) {
 	matchStatus, _ := p.RegMatchMessage(m.Content)
 	//doing `what`.
 	if matchStatus {
@@ -62,7 +62,7 @@ func (p *WhatPlugin) Trigger(trigger core.Trigger) {
 		if p.DiscordService.IsGuildMessageFromBotOrSelf(discordEvent.MessageCreate.Message) {
 			return
 		}
-		p.DoMessage(trigger.Bot, discordEvent.MessageCreate)
+		p.DoPlainMessage(trigger.Bot, discordEvent.MessageCreate)
 	default:
 		//not handling any other type of discordEvent.
 		return

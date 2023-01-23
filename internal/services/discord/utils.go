@@ -10,23 +10,23 @@ import (
 	"time"
 )
 
-func GenerateHelper(config HelperConfig) Helper {
+func GenerateHelper(config HelperConfig) HelperUtil {
 	helpMap := make(map[string]string)
 	for _, v := range config.CommandHelps {
 		helpMap[v.Name] = v.FormattedHelp
 	}
-	return Helper{
+	return HelperUtil{
 		pluginHelpText: config.PluginHelp,
 		commandsHelp:   helpMap,
 	}
 }
 
-type Helper struct {
+type HelperUtil struct {
 	pluginHelpText string
 	commandsHelp   map[string]string
 }
 
-func (h Helper) DiscordPluginHelp(pluginName string) string {
+func (h HelperUtil) DiscordPluginHelp(pluginName string) string {
 	var commandsName []string
 	for k := range h.commandsHelp {
 		commandsName = append(commandsName, k)
@@ -35,7 +35,7 @@ func (h Helper) DiscordPluginHelp(pluginName string) string {
 	return fmt.Sprintf("Commands provided by *%s* plugin: %v", pluginName, commandsName)
 }
 
-func (h Helper) DiscordCommandHelp(text string) string {
+func (h HelperUtil) DiscordCommandHelp(text string) string {
 	if help, ok := h.commandsHelp[text]; ok {
 		return fmt.Sprintf("**%s**\r%s", text, help)
 	} else {
@@ -60,7 +60,7 @@ type IDisrocdHelper interface {
 
 // ITextCommand Discord commands that may be triggered by plain discord message.
 type ITextCommand interface {
-	DoMessage(b *core.Bot, m *discordgo.MessageCreate) (err error)
+	DoPlainMessage(b *core.Bot, m *discordgo.MessageCreate) (err error)
 }
 
 type AppCommandsMap map[string]*discordgo.ApplicationCommand
@@ -72,18 +72,18 @@ func (acm *AppCommandsMap) RegisterCommand(cmd *discordgo.ApplicationCommand) {
 // ISlashCommand Discord commands that may be triggered by slash (`/`)
 type ISlashCommand interface {
 	DoNamedInteraction(b *core.Bot, i *discordgo.InteractionCreate) (err error)
-	GetAppCommandsMap() AppCommandsMap // often provided by SlashCommand struct
+	GetAppCommandsMap() AppCommandsMap // often provided by SlashCommandUtil struct
 }
 
-type SlashCommand struct {
+type SlashCommandUtil struct {
 	AppCommandsMap AppCommandsMap
 }
 
-func (cm *SlashCommand) GetAppCommandsMap() AppCommandsMap {
+func (cm *SlashCommandUtil) GetAppCommandsMap() AppCommandsMap {
 	return cm.AppCommandsMap
 }
 
-func (cm *SlashCommand) DefaultMatchCommand(i *discordgo.InteractionCreate) (bool, string) {
+func (cm *SlashCommandUtil) DefaultMatchCommand(i *discordgo.InteractionCreate) (bool, string) {
 	for _, slashCmd := range cm.AppCommandsMap {
 		if i.ApplicationCommandData().Name == slashCmd.Name {
 			return true, slashCmd.Name
@@ -92,7 +92,7 @@ func (cm *SlashCommand) DefaultMatchCommand(i *discordgo.InteractionCreate) (boo
 	return false, ""
 }
 
-func (cm *SlashCommand) ParseOptionsMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {
+func (cm *SlashCommandUtil) ParseOptionsMap(options []*discordgo.ApplicationCommandInteractionDataOption) map[string]*discordgo.ApplicationCommandInteractionDataOption {
 	optionMap := make(map[string]*discordgo.ApplicationCommandInteractionDataOption)
 	for _, opt := range options {
 		optionMap[opt.Name] = opt
@@ -105,13 +105,13 @@ type IBotCallingCommand interface {
 	IsCallingBot(content string) bool
 }
 
-// BotCallingCommand Functional structure for BotCallingCommand
+// BotCallingCommandUtil Functional structure for BotCallingCommandUtil
 // embedded a method for identifying @Bot texts
-type BotCallingCommand struct {
+type BotCallingCommandUtil struct {
 }
 
 // IsCallingBot Return true if the text starts with @{BotID}
-func (b BotCallingCommand) IsCallingBot(content string, config core.MessengerConfig) (isCalling bool, sanitizedContent string) {
+func (b BotCallingCommandUtil) IsCallingBot(content string, config core.MessengerConfig) (isCalling bool, sanitizedContent string) {
 	callingStr := fmt.Sprintf("<@%s>", config.BotID)
 	if strings.HasPrefix(content, callingStr) {
 		return true, strings.TrimSpace(strings.Replace(content, callingStr, "", 1))
@@ -303,6 +303,7 @@ func (DefaultPageRenderer) RenderPage(pager *Pager, toPage, limit int, embedFram
 }
 
 func FindFirstNonBotMsg(messages []*discordgo.Message) (*discordgo.Message, bool) {
+	// todo: add a skip-n enhancement
 	for _, v := range messages {
 		if !v.Author.Bot {
 			return v, true

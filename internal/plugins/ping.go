@@ -14,7 +14,7 @@ type PingPlugin struct {
 	core.Plugin
 	DiscordService *discord.Service
 	core.StartWithMatchUtil
-	discord.SlashCommand
+	discord.SlashCommandUtil
 	discord.IDisrocdHelper
 }
 
@@ -37,7 +37,7 @@ func (p *PingPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCre
 	return nil
 }
 
-func (p *PingPlugin) DoMessage(_ *core.Bot, m *discordgo.MessageCreate) error {
+func (p *PingPlugin) DoPlainMessage(_ *core.Bot, m *discordgo.MessageCreate) error {
 	if matched, _ := p.StartWithMatchUtil.MatchText(m.Content, p.DiscordService.DiscordAccountConfig); matched {
 		p.DiscordService.ChannelMessageSend(m.ChannelID, "Pong!")
 	}
@@ -83,7 +83,7 @@ func (p *PingPlugin) Trigger(trigger core.Trigger) {
 		if p.DiscordService.IsGuildMessageFromBotOrSelf(discordEvent.MessageCreate.Message) {
 			return
 		}
-		p.DoMessage(trigger.Bot, discordEvent.MessageCreate)
+		p.DoPlainMessage(trigger.Bot, discordEvent.MessageCreate)
 	case discord.EventTypeInteractionCreate:
 		p.DoNamedInteraction(trigger.Bot, discordEvent.InteractionCreate)
 	default:
