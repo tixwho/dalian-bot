@@ -171,7 +171,7 @@ func (h HookType) MessagePrompt(username string, uid int) string {
 	case HookSaveGuardComplete:
 		return fmt.Sprintf("DDTV completes saving guard info for live channel %s[%d].", username, uid)
 	case HookRunShellComplete:
-		return fmt.Sprintf("DDTV starts a shell task for live channel %s[%d].", username, uid)
+		return fmt.Sprintf("Shell task for live channel %s[%d] has started.", username, uid)
 	case HookDownloadEndMissionSuccess:
 		return fmt.Sprintf("DDTV completes a download task for live channel %s[%d].", username, uid)
 	case HookSpaceIsInsufficientWarn:
@@ -183,7 +183,7 @@ func (h HookType) MessagePrompt(username string, uid int) string {
 	case HookUpdateAvailable:
 		return "A new version of DDTV is available. Please update asap."
 	case HookShellExecutionComplete:
-		return fmt.Sprintf("Live channel %s[%d] hook successfully executed.", username, uid)
+		return fmt.Sprintf("Shell task for live channel %s[%d] has completed.", username, uid)
 	default:
 		return fmt.Sprintf("Unknown Hook Type: %s", reflect.TypeOf(h))
 	}
