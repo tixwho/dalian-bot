@@ -1,4 +1,4 @@
 current_path=$(realpath .)
 echo "Current Path: ${current_path}"
 cd "apps/dalian/dalian-deploy"
-exec ./dalian-next
+screen -dmS dalian dalian-next
