@@ -14,6 +14,10 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/exp/slices"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 // DDTVPlugin Receives DDTV Webhook and notify in channel
@@ -23,21 +27,22 @@ type DDTVPlugin struct {
 	DiscordService *discord.Service
 	DataService    *data.Service
 	discord.SlashCommandUtil
+	core.ArgParseUtil
 	discord.IDisrocdHelper
 }
 
 func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (e error) {
 	if isMatched, cmdName := p.DefaultMatchCommand(i); !isMatched {
-		fmt.Printf("nothing matched: %v", i)
+		//fmt.Printf("nothing matched: %v", i)
 		return nil
 	} else {
 		switch cmdName {
 		case "ddtv":
-			cmdOptions := i.ApplicationCommandData().Options
-			switch cmdOptions[0].Name {
+			cmdOption := i.ApplicationCommandData().Options[0]
+			switch cmdOption.Name {
 			case "webhook-channel":
-				cmdOptions := cmdOptions[0].Options
-				switch cmdOptions[0].Name {
+				cmdOption := cmdOption.Options[0]
+				switch cmdOption.Name {
 				case "set":
 					updateResult, err := p.upsertOneWebhookNotifyChannel(ddtvNotifyPo{
 						AdminDiscordUserID: i.Interaction.Member.User.ID,
@@ -64,6 +69,118 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCre
 					} else {
 						p.DiscordService.InteractionRespond(i.Interaction, "not a webhook channel yet!")
 					}
+				}
+			case "feature":
+				cmdOption := cmdOption.Options[0]
+				optionsMap := p.ParseOptionsMap(cmdOption.Options)
+				switch cmdOption.Name {
+				case "addone-by-uid":
+					// fetch uid (int64)
+					uid := optionsMap["uid"].IntValue()
+					// fetch and validate ddtvNotifyPo
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						return err
+					}
+					// avoid duplicate
+					if slices.Contains(notifyPo.FeaturedUIDs, uid) {
+						p.DiscordService.InteractionRespond(i.Interaction, "This streamer is already featured.")
+						return nil
+					}
+					// good, add the uid to slices
+					notifyPo.FeaturedUIDs = append(notifyPo.FeaturedUIDs, uid)
+					// database persistance
+					if _, err := p.upsertOneWebhookNotifyChannel(notifyPo); err != nil {
+						core.Logger.Warnf("Error updating webhook channel featured list: %v", err)
+						return err
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("Added the following streamer to featured list: %d", uid))
+				case "batch-modify":
+					// parse uids (string -> int64)
+					var uids []int64
+					uidsStr := optionsMap["uids"].StringValue()
+					appendFlag := optionsMap["append"].BoolValue()
+					if uidsStr == "-" {
+						//clean up
+						uids = []int64{}
+					} else {
+						rawUidsStrings := p.SeparateArgs(uidsStr, p.DiscordService.DiscordAccountConfig.Separator)
+						// iter through and validate uids
+						for _, v := range rawUidsStrings {
+							parsedInt64, err := strconv.ParseInt(v, 10, 64)
+							if err != nil {
+								p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("\"%s\" is not a valid int64!", v))
+								return nil
+							}
+							if !slices.Contains(uids, parsedInt64) {
+								uids = append(uids, parsedInt64)
+							}
+						}
+					}
+					// find and modify notifyPo when necessary
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						return err
+					}
+					// replace or append uid list
+					if !appendFlag {
+						// a complete replace.
+						notifyPo.FeaturedUIDs = uids
+					} else {
+						for _, v := range uids {
+							if !slices.Contains(notifyPo.FeaturedUIDs, v) {
+								notifyPo.FeaturedUIDs = append(notifyPo.FeaturedUIDs, v)
+							}
+						}
+					}
+					// database persistance
+					if _, err := p.upsertOneWebhookNotifyChannel(notifyPo); err != nil {
+						core.Logger.Warnf("Error updating webhook channel featured list: %v", err)
+						return err
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("Updated featured list: %v", notifyPo.FeaturedUIDs))
+
+				case "status":
+					dumpFlag := false
+					if dump, ok := optionsMap["dump"]; ok {
+						dumpFlag = dump.BoolValue()
+					}
+					// fetch and validate ddtvNotifyPo
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						return err
+					}
+					currentUIDs := notifyPo.FeaturedUIDs
+					// if nothing to show
+					if len(notifyPo.FeaturedUIDs) == 0 {
+						p.DiscordService.InteractionRespond(i.Interaction, "Featured list empty. Push ALL webhook notifications by default.")
+						return nil
+					}
+					sort.Slice(notifyPo.FeaturedUIDs, func(i, j int) bool { return notifyPo.FeaturedUIDs[i] < notifyPo.FeaturedUIDs[j] })
+					ansStr := fmt.Sprintf("%d streamers featured: %v", len(currentUIDs), currentUIDs)
+					if dumpFlag {
+						var strSlice []string
+						for _, v := range currentUIDs {
+							strSlice = append(strSlice, strconv.FormatInt(v, 10))
+						}
+						ansStr += fmt.Sprintf("\rHere's the dump for you:\r```%s```", strings.Join(strSlice[:], p.DiscordService.DiscordAccountConfig.Separator))
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, ansStr)
 				}
 			}
 		}
@@ -103,6 +220,59 @@ func (p *DDTVPlugin) Init(reg *core.ServiceRegistry) error {
 						Name:        "remove",
 						Type:        discordgo.ApplicationCommandOptionSubCommand,
 						Description: "Remove current channel as ddtv webhook channel",
+					},
+				},
+			},
+			{
+				Name:        "feature",
+				Description: "featuring webhook notifications by streamers and/or types",
+				Type:        discordgo.ApplicationCommandOptionSubCommandGroup,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						//todo: add helper
+						Name:        "addone-by-uid",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Add a streamer to current channel's featured list",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionInteger,
+								Name:        "uid",
+								Required:    true,
+								Description: "The bilibili UID of the streamer (not RoomID!)",
+							},
+						},
+					}, {
+						//todo: add helper
+						Name:        "batch-modify",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Append or replace the featured list with input",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionString,
+								Name:        "uids",
+								Required:    true,
+								Description: fmt.Sprintf("The bilibili UID of the streamer, separated by default separator (%s)", p.DiscordService.DiscordAccountConfig.Separator),
+							},
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "append",
+								Required:    true,
+								Description: "Whether dalian should append or DISCARD existing lists and use new one.",
+							},
+						},
+					}, {
+						//todo: add helper
+						Name:        "status",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Display the current featured list for this channel",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "dump",
+								Required:    false,
+								Description: "Whether dalian should dump all existing featured streamers",
+							},
+						},
 					},
 				},
 			},
@@ -171,17 +341,25 @@ func (p *DDTVPlugin) Trigger(trigger core.Trigger) {
 }
 
 func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv.WebHook) {
-	channelIDs, err := p.findDDTVWebhookNotifyChannels()
+	channels, err := p.fetchDDTVWebhookNotifyChannels()
 	if err != nil {
 		core.Logger.Warnf("Retrieve webhook channels failed!: %v", err)
 		return
 	}
-	for _, channelID := range channelIDs {
-		_, err := p.DiscordService.ChannelMessageSendEmbed(channelID, webhook.DigestEmbed())
+	for _, channel := range channels {
+		// check feature group only when it's not empty
+		if len(channel.FeaturedUIDs) != 0 {
+			// do NOT display if the user is not in the list
+			if !slices.Contains(channel.FeaturedUIDs, webhook.Uid) {
+				//SKIP this channel
+				continue
+			}
+		}
+		_, err := p.DiscordService.ChannelMessageSendEmbed(channel.NotifyChannelID, webhook.DigestEmbed())
 		if err != nil {
 			core.Logger.Warnf("Embed sent failed: %v", err)
 			b, _ := json.Marshal(webhook)
-			p.DiscordService.ChannelMessageSendCodeBlock(channelID, string(b))
+			p.DiscordService.ChannelMessageSendCodeBlock(channel.NotifyChannelID, string(b))
 			return
 		}
 	}
@@ -193,10 +371,17 @@ type ddtvNotifyPo struct {
 	AdminDiscordUserID string             `bson:"admin_dc_user_id"`
 	GuildID            string             `bson:"guild_id"`
 	NotifyChannelID    string             `bson:"notify_channel_id"`
+	FeaturedUIDs       []int64            `bson:"featured_uid_list"`
 }
 
 func (p *DDTVPlugin) getCollection() *mongo.Collection {
 	return p.DataService.GetCollection("ddtv_notify_channels")
+}
+
+func (p *DDTVPlugin) findOneWebhookNotifyChannelByChannelID(channelID string) (ddtvNotifyPo, error) {
+	var result ddtvNotifyPo
+	rawResult := p.DataService.FindOne(&result, p.getCollection(), context.Background(), bson.M{"notify_channel_id": channelID})
+	return result, rawResult.Err()
 }
 
 func (p *DDTVPlugin) upsertOneWebhookNotifyChannel(po ddtvNotifyPo) (*mongo.UpdateResult, error) {
@@ -209,7 +394,7 @@ func (p *DDTVPlugin) deleteOneWebhookNotifyChannel(channelID string) (*mongo.Del
 	return rawResult.DeleteResult(), rawResult.Err()
 }
 
-func (p *DDTVPlugin) findDDTVWebhookNotifyChannels() (channels []string, er error) {
+func (p *DDTVPlugin) findDDTVWebhookNotifyChannelIDs() (channels []string, er error) {
 	var results []ddtvNotifyPo
 	if err := p.DataService.Find(&results, p.getCollection(), context.Background(), bson.M{}); err != nil {
 		return nil, err
@@ -220,6 +405,13 @@ func (p *DDTVPlugin) findDDTVWebhookNotifyChannels() (channels []string, er erro
 	}
 	return channelIDs, nil
 
+}
+
+func (p *DDTVPlugin) fetchDDTVWebhookNotifyChannels() (channels []ddtvNotifyPo, er error) {
+	if err := p.DataService.Find(&channels, p.getCollection(), context.Background(), bson.M{}); err != nil {
+		return nil, err
+	}
+	return channels, nil
 }
 
 func NewDDTVPlugin(reg *core.ServiceRegistry) core.IPlugin {
