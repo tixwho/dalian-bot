@@ -38,6 +38,10 @@ func NewBot() *Bot {
 	return bot
 }
 
+//func NewBotNext() *Bot {
+//	c := dig.New()
+//}
+
 // Run start the bot and listen to incoming events.
 func (b *Bot) Run() {
 	b.DispatcherChan, _ = b.ServiceRegistry.InstallTriggerChanForAll()
