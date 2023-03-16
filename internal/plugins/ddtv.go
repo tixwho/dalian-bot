@@ -70,7 +70,7 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCre
 						p.DiscordService.InteractionRespond(i.Interaction, "not a webhook channel yet!")
 					}
 				}
-			case "feature":
+			case "streamers":
 				cmdOption := cmdOption.Options[0]
 				optionsMap := p.ParseOptionsMap(cmdOption.Options)
 				switch cmdOption.Name {
@@ -182,7 +182,121 @@ func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCre
 					}
 					p.DiscordService.InteractionRespond(i.Interaction, ansStr)
 				}
+			case "webhooks":
+				cmdOption := cmdOption.Options[0]
+				optionsMap := p.ParseOptionsMap(cmdOption.Options)
+				switch cmdOption.Name {
+				case "addone-by-code":
+					// fetch hook code (int)
+					hookCode := int(optionsMap["webhook-code"].IntValue())
+					// fetch and validate ddtvNotifyPo
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						p.DiscordService.InteractionRespond(i.Interaction, "internal error.")
+						return err
+					}
+					// avoid duplicate
+					if slices.Contains(notifyPo.FeaturedHookTypes, hookCode) {
+						p.DiscordService.InteractionRespond(i.Interaction, "This streamer is already featured.")
+						return nil
+					}
+					// good, add the hook code to slices
+					notifyPo.FeaturedHookTypes = append(notifyPo.FeaturedHookTypes, hookCode)
+					// database persistance
+					if _, err := p.upsertOneWebhookNotifyChannel(notifyPo); err != nil {
+						core.Logger.Warnf("Error updating webhook channel featured list: %v", err)
+						return err
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("Added the following hooktype code to featured list: %d", hookCode))
+				case "batch-modify":
+					// parse hook types (string -> int)
+					var hookTypes []int
+					hookTypesStr := optionsMap["webhook-codes"].StringValue()
+					appendFlag := optionsMap["append"].BoolValue()
+					if hookTypesStr == "-" {
+						//clean up
+						hookTypes = []int{}
+					} else {
+						rawHooksStrings := p.SeparateArgs(hookTypesStr, p.DiscordService.DiscordAccountConfig.Separator)
+						// iter through and validate webhook types
+						for _, v := range rawHooksStrings {
+							parsedInt, err := strconv.Atoi(v)
+							if err != nil {
+								p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("\"%s\" is not a valid int!", v))
+								return nil
+							}
+							if !slices.Contains(hookTypes, parsedInt) {
+								hookTypes = append(hookTypes, parsedInt)
+							}
+						}
+					}
+					// find and modify notifyPo when necessary
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						return err
+					}
+					// replace or append webhook types list
+					if !appendFlag {
+						// a complete replace.
+						notifyPo.FeaturedHookTypes = hookTypes
+					} else {
+						for _, v := range hookTypes {
+							if !slices.Contains(notifyPo.FeaturedHookTypes, v) {
+								notifyPo.FeaturedHookTypes = append(notifyPo.FeaturedHookTypes, v)
+							}
+						}
+					}
+					// database persistance
+					if _, err := p.upsertOneWebhookNotifyChannel(notifyPo); err != nil {
+						core.Logger.Warnf("Error updating webhook types featured list: %v", err)
+						return err
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, fmt.Sprintf("Updated featured list: %v", notifyPo.FeaturedHookTypes))
+
+				case "status":
+					dumpFlag := false
+					if dump, ok := optionsMap["dump"]; ok {
+						dumpFlag = dump.BoolValue()
+					}
+					// fetch and validate ddtvNotifyPo
+					notifyPo, err := p.findOneWebhookNotifyChannelByChannelID(i.Interaction.ChannelID)
+					if err != nil {
+						if err == mongo.ErrNoDocuments {
+							p.DiscordService.InteractionRespond(i.Interaction, "This is not a notification channel yet! Consider making it one by using *ddtv webhook-channel set*?")
+							return nil
+						}
+						core.Logger.Warnf("Error finding webhook channel record: %v", err)
+						return err
+					}
+					currentWebhookTypes := notifyPo.FeaturedHookTypes
+					// if nothing to show
+					if len(currentWebhookTypes) == 0 {
+						p.DiscordService.InteractionRespond(i.Interaction, "Featured list empty. Push ALL webhook notifications by default.")
+						return nil
+					}
+					sort.Slice(currentWebhookTypes, func(i, j int) bool { return currentWebhookTypes[i] < currentWebhookTypes[j] })
+					ansStr := fmt.Sprintf("%d webhook types featured: %v", len(currentWebhookTypes), currentWebhookTypes)
+					if dumpFlag {
+						var strSlice []string
+						for _, v := range currentWebhookTypes {
+							strSlice = append(strSlice, strconv.Itoa(v))
+						}
+						ansStr += fmt.Sprintf("\rHere's the dump for you:\r```%s```", strings.Join(strSlice[:], p.DiscordService.DiscordAccountConfig.Separator))
+					}
+					p.DiscordService.InteractionRespond(i.Interaction, ansStr)
+				}
 			}
+
 		}
 	}
 
@@ -224,7 +338,7 @@ func (p *DDTVPlugin) Init(reg *core.ServiceRegistry) error {
 				},
 			},
 			{
-				Name:        "feature",
+				Name:        "streamers",
 				Description: "featuring webhook notifications by streamers and/or types",
 				Type:        discordgo.ApplicationCommandOptionSubCommandGroup,
 				Options: []*discordgo.ApplicationCommandOption{
@@ -271,6 +385,58 @@ func (p *DDTVPlugin) Init(reg *core.ServiceRegistry) error {
 								Name:        "dump",
 								Required:    false,
 								Description: "Whether dalian should dump all existing featured streamers",
+							},
+						},
+					},
+				},
+			}, {
+				Name:        "webhooks",
+				Description: "featuring webhook notifications by webhook types",
+				Type:        discordgo.ApplicationCommandOptionSubCommandGroup,
+				Options: []*discordgo.ApplicationCommandOption{
+					{
+						//todo: add helper
+						Name:        "addone-by-code",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Add a webbhook type code to featured list",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionInteger,
+								Name:        "webhook-code",
+								Required:    true,
+								Description: "The webhook type code of the DDTV Webhook.",
+							},
+						},
+					}, {
+						//todo: add helper
+						Name:        "batch-modify",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Append or replace the featured list with input",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionString,
+								Name:        "webhook-codes",
+								Required:    true,
+								Description: fmt.Sprintf("TThe webhook type code of the DDTV Webhook, separated by default separator (%s)", p.DiscordService.DiscordAccountConfig.Separator),
+							},
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "append",
+								Required:    true,
+								Description: "Whether dalian should append or DISCARD existing lists and use new one.",
+							},
+						},
+					}, {
+						//todo: add helper
+						Name:        "status",
+						Type:        discordgo.ApplicationCommandOptionSubCommand,
+						Description: "Display the current featured list for this channel",
+						Options: []*discordgo.ApplicationCommandOption{
+							{
+								Type:        discordgo.ApplicationCommandOptionBoolean,
+								Name:        "dump",
+								Required:    false,
+								Description: "Whether dalian should dump all existing featured webhook type codes",
 							},
 						},
 					},
@@ -355,6 +521,14 @@ func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv.WebHook) {
 				continue
 			}
 		}
+		// check feature group only when it's not empty
+		if len(channel.FeaturedHookTypes) != 0 {
+			// do NOT display if the webhook type is incorrect
+			if !slices.Contains(channel.FeaturedHookTypes, webhook.Type.Value()) {
+				//SKIP this webhook type
+				continue
+			}
+		}
 		_, err := p.DiscordService.ChannelMessageSendEmbed(channel.NotifyChannelID, webhook.DigestEmbed())
 		if err != nil {
 			core.Logger.Warnf("Embed sent failed: %v", err)
@@ -372,6 +546,7 @@ type ddtvNotifyPo struct {
 	GuildID            string             `bson:"guild_id"`
 	NotifyChannelID    string             `bson:"notify_channel_id"`
 	FeaturedUIDs       []int64            `bson:"featured_uid_list"`
+	FeaturedHookTypes  []int              `bson:"featured_hook_types"`
 }
 
 func (p *DDTVPlugin) getCollection() *mongo.Collection {

@@ -208,3 +208,14 @@ const (
 	HookUpdateAvailable
 	HookShellExecutionComplete
 )
+
+var hookCollection []HookType = []HookType{HookStartLive, HookStopLive, HookStartRec, HookRecComplete, HookCancelRec, HookTranscodingComlete, HookSaveDanmuComplete, HookSaveSCComplete,
+	HookSaveGiftComplete, HookSaveGuardComplete, HookRunShellComplete, HookDownloadEndMissionSuccess, HookSpaceIsInsufficientWarn, HookLoginFailure, HookLoginWillExpireSoon, HookUpdateAvailable,
+	HookShellExecutionComplete}
+
+func parseHook(code int) (HookType, error) {
+	if code < 0 || code >= len(hookCollection) {
+		return -1, fmt.Errorf("invalid webhook code")
+	}
+	return hookCollection[code], nil
+}
