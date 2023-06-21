@@ -141,6 +141,10 @@ func (s *Service) Start(wg *sync.WaitGroup) {
 		BotID:     s.Session.State.User.ID,
 	}
 	core.Logger.Debugf("Service [%s] is now online.", reflect.TypeOf(s))
+	//Send an online message if the config have an admin-channel
+	if s.ServiceConfig.AdminChannel != "" {
+		s.ChannelMessageSend(s.ServiceConfig.AdminChannel, "Dalian is now ONLINE!")
+	}
 	wg.Done()
 }
 
@@ -238,5 +242,6 @@ func (s *Service) IsGuildMessageFromBotOrSelf(m *discordgo.Message) bool {
 }
 
 type ServiceConfig struct {
-	Token string
+	Token        string
+	AdminChannel string
 }
