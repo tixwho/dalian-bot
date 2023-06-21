@@ -10,7 +10,6 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/pkg/errors v0.9.1
 	go.mongodb.org/mongo-driver v1.11.7
-	go.uber.org/dig v1.16.1
 	go.uber.org/zap v1.24.0
 	golang.org/x/exp v0.0.0-20230522175609-2e198f4a06a1
 	golang.org/x/net v0.11.0
@@ -61,5 +60,4 @@ require (
 	golang.org/x/text v0.10.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
-	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
