@@ -15,6 +15,7 @@ type Cred struct {
 
 type DiscordCred struct {
 	DiscordToken yaml.Node `yaml:"token"`
+	AdminChannel yaml.Node `yaml:"admin-channel,omitempty"`
 }
 
 type MongoCred struct {
