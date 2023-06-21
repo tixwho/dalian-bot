@@ -15,7 +15,7 @@ type PingPlugin struct {
 	DiscordService *discord.Service
 	core.StartWithMatchUtil
 	discord.SlashCommandUtil
-	discord.IDisrocdHelper
+	discord.IDiscordHelper
 }
 
 func (p *PingPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (err error) {
@@ -60,7 +60,7 @@ func (p *PingPlugin) Init(reg *core.ServiceRegistry) error {
 	})
 
 	formattedPingHelp := fmt.Sprintf("*Call*: /ping,%sping\rrespond a \"pong\"", p.DiscordService.DiscordAccountConfig.Prefix)
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDiscordHelper = discord.GenerateHelper(discord.HelperConfig{
 		PluginHelp: "Basic ping command for dalian over Discord.",
 		CommandHelps: []discord.CommandHelp{
 			{

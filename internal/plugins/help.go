@@ -16,7 +16,7 @@ type HelpPlugin struct {
 	core.StartWithMatchUtil                   // plain message support
 	core.ArgParseUtil                         // command argument support
 	discord.SlashCommandUtil                  // discord slash command support
-	discord.IDisrocdHelper                    // the plugin itself needs to display help texts.
+	discord.IDiscordHelper                    // the plugin itself needs to display help texts.
 }
 
 // DoNamedInteraction `/help [command-name]` support
@@ -46,7 +46,7 @@ func parseHelpText(b *core.Bot, commandName string) string {
 		helpText += "**Available Commands**"
 	}
 	for _, plugin := range b.PluginRegistry.GetPlugins() {
-		if helpPlugin, ok := plugin.(discord.IDisrocdHelper); ok {
+		if helpPlugin, ok := plugin.(discord.IDiscordHelper); ok {
 			if commandName == "" {
 				//general help
 				helpText += "\r" + helpPlugin.DiscordPluginHelp(plugin.GetName())
@@ -109,7 +109,7 @@ func (p *HelpPlugin) Init(reg *core.ServiceRegistry) error {
 Display the help message.
 If command-name not provided, list the names of all available commands; Otherwise, provide detailed explaination of the specific command.`,
 		p.DiscordService.DiscordAccountConfig.Prefix)
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDiscordHelper = discord.GenerateHelper(discord.HelperConfig{
 		PluginHelp: "HelperUtil support for Dalian.",
 		CommandHelps: []discord.CommandHelp{
 			{

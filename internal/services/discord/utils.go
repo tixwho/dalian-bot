@@ -53,7 +53,7 @@ type CommandHelp struct {
 	FormattedHelp string
 }
 
-type IDisrocdHelper interface {
+type IDiscordHelper interface {
 	DiscordPluginHelp(pluginName string) string
 	DiscordCommandHelp(text string) string
 }

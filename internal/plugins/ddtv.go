@@ -28,7 +28,7 @@ type DDTVPlugin struct {
 	DataService    *data.Service
 	discord.SlashCommandUtil
 	core.ArgParseUtil
-	discord.IDisrocdHelper
+	discord.IDiscordHelper
 }
 
 func (p *DDTVPlugin) DoNamedInteraction(_ *core.Bot, i *discordgo.InteractionCreate) (e error) {
@@ -452,7 +452,7 @@ Dalian will send a message for every incoming DDTV webhook received in this chan
 Remove current channel from DDTV webhook notification channel list.
 Dalian will no longer send a message for every incoming DDTV webhook received in this channel`
 
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDiscordHelper = discord.GenerateHelper(discord.HelperConfig{
 		PluginHelp: "HelperUtil support for Dalian.",
 		CommandHelps: []discord.CommandHelp{
 			{

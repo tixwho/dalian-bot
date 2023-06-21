@@ -23,7 +23,7 @@ type ArchivePlugin struct {
 	DiscordService *discord.Service
 	DataService    *data.Service
 	discord.SlashCommandUtil
-	discord.IDisrocdHelper
+	discord.IDiscordHelper
 	core.ArgParseUtil
 	core.StageUtil
 }
@@ -424,7 +424,7 @@ You MUST first run a query with *archive site list* to get an active relative-ID
 Delete a site archived by dalian.
 You MUST first run a query with *archive site list* to get an active relative-ID for the site`
 
-	p.IDisrocdHelper = discord.GenerateHelper(discord.HelperConfig{
+	p.IDiscordHelper = discord.GenerateHelper(discord.HelperConfig{
 		PluginHelp: "Archive online resources.",
 		CommandHelps: []discord.CommandHelp{
 			{
