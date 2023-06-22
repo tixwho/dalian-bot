@@ -533,7 +533,7 @@ func (p *DDTVPlugin) notifyDDTVWebhookToChannels(webhook ddtv.WebHook) {
 		if err != nil {
 			core.Logger.Warnf("Embed sent failed: %v", err)
 			b, _ := json.Marshal(webhook)
-			p.DiscordService.ChannelMessageSendCodeBlock(channel.NotifyChannelID, string(b))
+			p.DiscordService.ChannelMessageSendCodeBlock(channel.NotifyChannelID, err.Error()+"\n"+string(b))
 			return
 		}
 	}
