@@ -95,6 +95,15 @@ func (s *Service) ChannelFileSend(channelID, name string, r io.Reader) error {
 	return nil
 }
 
+func (s *Service) WebhookExecuteComplex(webhookID, webhookToken string, wait bool, data *discordgo.WebhookParams) error {
+	_, err := s.Session.WebhookExecute(webhookID, webhookToken, wait, data)
+	return err
+}
+
+func (s *Service) WebhookMessageSend(webhookID, webhookToken, content string) error {
+	return s.WebhookExecuteComplex(webhookID, webhookToken, false, &discordgo.WebhookParams{Content: content})
+}
+
 type appCommands []*discordgo.ApplicationCommand
 
 func (cmds appCommands) delete(cmd *discordgo.ApplicationCommand) appCommands {
